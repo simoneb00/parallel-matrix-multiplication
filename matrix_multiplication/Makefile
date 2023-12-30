@@ -36,3 +36,4 @@ clean:
 	@echo
 	@echo "Cleaning up..."
 	rm -f matrix_multiplication
+	rm -f parallel_computation

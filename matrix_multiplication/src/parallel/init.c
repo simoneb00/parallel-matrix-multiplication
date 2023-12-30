@@ -15,19 +15,39 @@
 /// @param proc_rows Number of rows of the process grid
 /// @param proc_cols Number of columns of the process grid
 /// @return Number of floats the process should allocate to receive its portion of the matrix
-int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows, int block_cols, int proc_rows, int proc_cols) {
+int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows, int block_cols, int proc_rows, int proc_cols, int my_rank) {
+    
+    int blocks_assigned_hor, blocks_assigned_vert;
+    if (my_rank == 0 || my_rank == 1) {
+        printf("matrix_cols/block_cols = %d\n", matrix_cols/block_cols);
+        printf("matrix_cols/block_cols mod proc_cols = %d\n", (matrix_cols/block_cols)%proc_cols);
+        printf("(matrix_cols/block_cols)/proc_cols = %d\n", (matrix_cols/block_cols)/proc_cols);
+    }
 
-    /* compute how many blocks there are on the vertical "axis" and how they're distributed among processes */
-    float blocks_on_vert = matrix_rows / block_rows;
-    int blocks_assigned_on_vert = ceil(blocks_on_vert / proc_rows);
+    if (my_rank < (matrix_cols / block_cols) % proc_cols) {
+        blocks_assigned_hor = (matrix_cols / block_cols)/proc_cols + 1;
+    } else {
+        blocks_assigned_hor = (matrix_cols / block_cols) / proc_cols;
+    }
 
-    /* compute how many blocks there are on the horizontal "axis" and how they're distributed among processes */
-    float blocks_on_hor = matrix_cols / block_cols;
-    int blocks_assigned_on_hor = ceil(blocks_on_hor / proc_cols);
+    if (my_rank == 0 || my_rank == 1) {
+        printf("matrix_rows/block_rows = %d\n", matrix_rows/block_rows);
+        printf("matrix_rows/block_rows mod proc_rows = %d\n", (matrix_rows/block_rows)%proc_rows);
+        printf("(matrix_rows/block_rows)/proc_rows = %d\n", (matrix_rows/block_rows)/proc_rows);
+    }
 
-    float total_blocks_assigned = blocks_assigned_on_hor * blocks_assigned_on_vert;
+    if (my_rank < (matrix_rows / block_rows) % proc_rows) {
+        blocks_assigned_vert = (matrix_rows / block_rows)/proc_rows + 1;
+    } else {
+        blocks_assigned_vert = (matrix_rows / block_rows)/proc_rows;
+    }
 
-    return total_blocks_assigned * block_rows * block_cols;
+    printf("[Process %d] Assigned %d blocks on hor\n", my_rank, blocks_assigned_hor);
+    printf("[Process %d] Assigned %d blocks vert\n", my_rank, blocks_assigned_vert);
+    printf("[Process %d] Assigned %d blocks\n", my_rank, blocks_assigned_hor * blocks_assigned_vert);
+
+    return blocks_assigned_hor * blocks_assigned_vert * block_rows * block_cols;
+
 
 }
 
@@ -74,7 +94,7 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
     psizes[1] = Q; /* no. of processes in horizontal dimension of process grid */
 
     MPI_Type_create_darray(P * Q, rank, 2, gsizes, distribs, dargs, psizes,
-            MPI_ORDER_FORTRAN, MPI_FLOAT, &filetype);
+            MPI_ORDER_C, MPI_FLOAT, &filetype);
     MPI_Type_commit(&filetype);
 
     MPI_File_open(comm, filename,
@@ -90,7 +110,7 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
             MPI_INFO_NULL);
 
     
-    matrix_size = compute_submatrix_dimension(rows, cols, block_rows, block_cols, P, Q);
+    matrix_size = compute_submatrix_dimension(rows, cols, block_rows, block_cols, P, Q, rank);
 
     matrix = (float*) malloc(matrix_size * sizeof(float));
     MPI_File_read_all(file, matrix, matrix_size,
@@ -120,6 +140,5 @@ int main(int argc, char** argv) {
     float *matrix;
     block_cyclic_distribution("A.bin", matrix, 12, 12, 3, 3, 3, 2, comm);    
 
-    // Finalize the MPI environment.
     MPI_Finalize();
 }
