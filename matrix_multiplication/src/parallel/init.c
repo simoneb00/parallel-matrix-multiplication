@@ -15,8 +15,71 @@
 /// @param proc_rows Number of rows of the process grid
 /// @param proc_cols Number of columns of the process grid
 /// @return Number of floats the process should allocate to receive its portion of the matrix
-int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows, int block_cols, int proc_rows, int proc_cols, int my_rank) {
+int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows, int block_cols, int proc_rows, int proc_cols, int my_rank, int size) {
+
+    int my_rank_coord_x, my_rank_coord_y;
+
+    int all_procs[size];
+    for (int i = 0; i < size; i++) {
+        all_procs[i] = i;
+    }
+
+    int procs_map[proc_rows][proc_cols];
+    int k = 0;
+    for (int i = 0; i < proc_rows; i++) {
+        for (int j = 0; j < proc_cols; j++) {
+            procs_map[i][j] = all_procs[k];
+            if (all_procs[k] == my_rank) {
+                my_rank_coord_x = i;
+                my_rank_coord_y = j;
+            }
+            k++;
+        }
+    }
+
+    printf("[Process %d] My coordinates are (%d, %d)", my_rank, my_rank_coord_x, my_rank_coord_y);
     
+    int num_blocks_cols = matrix_cols / block_cols; // 4
+    int num_block_cols_for_this_process = num_blocks_cols / proc_cols; // 2
+    int num_cols;
+    int num_blocks_rows = matrix_rows / block_rows; // 4
+    int num_block_rows_for_this_process = num_blocks_rows / proc_rows; // 1
+    int num_rows;
+
+    /* COLUMNS */
+    if (my_rank_coord_x < num_blocks_cols % proc_cols) {
+        num_block_cols_for_this_process++;
+    } 
+
+    num_cols = num_block_cols_for_this_process * block_cols;
+
+    if (my_rank_coord_x % proc_cols == 0) {
+        num_cols += matrix_cols % block_cols;
+    }
+
+    /* ROWS */
+    
+    if (my_rank_coord_y < num_blocks_rows % proc_rows) {
+        num_block_rows_for_this_process++;
+    } 
+
+    num_rows = num_block_rows_for_this_process * block_rows;
+
+    if (my_rank_coord_y % proc_rows == 0) {
+        num_rows += matrix_rows % block_rows;
+    }
+
+
+    printf("[Process %d] Assigned %d elements to me\n", my_rank, num_cols*num_rows);
+    printf("[Process %d] Assigned %d rows to me\n", my_rank, num_rows);
+    printf("[Process %d] Assigned %d cols to me\n", my_rank, num_cols);
+
+    return num_cols * num_rows;
+
+
+
+
+    /*
     int blocks_assigned_hor, blocks_assigned_vert;
     if (my_rank == 0 || my_rank == 1) {
         printf("matrix_cols/block_cols = %d\n", matrix_cols/block_cols);
@@ -48,6 +111,7 @@ int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows
 
     return blocks_assigned_hor * blocks_assigned_vert * block_rows * block_cols;
 
+*/
 
 }
 
@@ -110,13 +174,24 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
             MPI_INFO_NULL);
 
     
-    matrix_size = compute_submatrix_dimension(rows, cols, block_rows, block_cols, P, Q, rank);
+    matrix_size = compute_submatrix_dimension(rows, cols, block_rows, block_cols, P, Q, rank, size);
 
     matrix = (float*) malloc(matrix_size * sizeof(float));
     MPI_File_read_all(file, matrix, matrix_size,
             MPI_FLOAT, &status);
 
     MPI_File_close(&file);
+
+    /** 
+     * Transform the 1D array to a 2D array
+     * i.e.: get how many blocks are assigned on this process on the hor axis and on the vert axis,
+     * and compute how many rows and columns are in the process' submatrix.
+     */
+
+    
+
+    /* Extract blocks from array */
+    MPI_Datatype subarray_type; 
 
     printf("\n======\ni = %d\nBlock received : ", rank);
     for (int i = 0; i < matrix_size; i++) {
