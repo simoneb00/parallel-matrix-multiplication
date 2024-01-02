@@ -19,99 +19,55 @@ int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows
 
     int my_rank_coord_x, my_rank_coord_y;
 
-    int all_procs[size];
-    for (int i = 0; i < size; i++) {
-        all_procs[i] = i;
-    }
+    my_rank_coord_x = my_rank / proc_cols;
+    my_rank_coord_y = my_rank % proc_cols; 
 
-    int procs_map[proc_rows][proc_cols];
-    int k = 0;
-    for (int i = 0; i < proc_rows; i++) {
-        for (int j = 0; j < proc_cols; j++) {
-            procs_map[i][j] = all_procs[k];
-            if (all_procs[k] == my_rank) {
-                my_rank_coord_x = i;
-                my_rank_coord_y = j;
-            }
-            k++;
-        }
-    }
-
-    printf("[Process %d] My coordinates are (%d, %d)", my_rank, my_rank_coord_x, my_rank_coord_y);
+    //printf("[Process %d] my coordinates are (%d, %d)\n", my_rank, my_rank_coord_x, my_rank_coord_y);
     
-    int num_blocks_cols = matrix_cols / block_cols; // 4
-    int num_block_cols_for_this_process = num_blocks_cols / proc_cols; // 2
-    int num_cols;
-    int num_blocks_rows = matrix_rows / block_rows; // 4
-    int num_block_rows_for_this_process = num_blocks_rows / proc_rows; // 1
-    int num_rows;
 
-    /* COLUMNS */
-    if (my_rank_coord_x < num_blocks_cols % proc_cols) {
-        num_block_cols_for_this_process++;
+    /* COLS */
+    int tot_num_blocks = ceil((float)matrix_cols / (float)block_cols); // 12 / 3 = 4
+
+    int tot_blocks_assigned = tot_num_blocks / proc_cols; // 4 / 2 = 2
+
+    if (tot_num_blocks % proc_cols != 0 && my_rank_coord_y < tot_num_blocks % proc_cols) {
+            tot_blocks_assigned++;
     } 
 
-    num_cols = num_block_cols_for_this_process * block_cols;
+    /* assign last block portion */
 
-    if (my_rank_coord_x % proc_cols == 0) {
-        num_cols += matrix_cols % block_cols;
+    int tot_nums_assigned_x = tot_blocks_assigned * block_cols; // 2 * 3 = 6
+
+    int last_process_x = tot_num_blocks % proc_cols == 0 ? proc_cols -1 : (tot_num_blocks % proc_cols) -1;
+    if (my_rank_coord_y == last_process_x && matrix_cols % block_cols != 0) {
+        tot_nums_assigned_x -= (block_cols - (matrix_cols % block_cols));
     }
 
-    /* ROWS */
-    
-    if (my_rank_coord_y < num_blocks_rows % proc_rows) {
-        num_block_rows_for_this_process++;
+    /* ROWS */ 
+    // my_rank_coord_x = 1 
+    tot_num_blocks = ceil((float)matrix_rows / (float)block_rows);    // 25 / 3 = 9
+
+    tot_blocks_assigned = tot_num_blocks / proc_rows;   // 9 / 3 = 3
+
+    if (tot_num_blocks % proc_rows != 0 && my_rank_coord_x < tot_num_blocks % proc_rows) {
+            tot_blocks_assigned++;
     } 
 
-    num_rows = num_block_rows_for_this_process * block_rows;
+    /* assign last block portion */
 
-    if (my_rank_coord_y % proc_rows == 0) {
-        num_rows += matrix_rows % block_rows;
+    int tot_nums_assigned_y = tot_blocks_assigned * block_rows; // 3 * 3 = 9
+
+    int last_process_y = ((tot_num_blocks % proc_rows) == 0) ? (proc_rows -1) : ((tot_num_blocks % proc_rows) -1);  // 2
+    if (my_rank_coord_x == last_process_y && matrix_rows % block_rows != 0) {
+        tot_nums_assigned_y -= (block_rows - (matrix_rows % block_rows));
     }
 
+    printf("[Process %d] Assigned %d rows\n", my_rank, tot_nums_assigned_y);
+    printf("[Process %d] Assigned %d cols\n", my_rank, tot_nums_assigned_x);
+    printf("[Process %d] Assigned %d elements\n", my_rank, tot_nums_assigned_y * tot_nums_assigned_x);
+    puts("");
 
-    printf("[Process %d] Assigned %d elements to me\n", my_rank, num_cols*num_rows);
-    printf("[Process %d] Assigned %d rows to me\n", my_rank, num_rows);
-    printf("[Process %d] Assigned %d cols to me\n", my_rank, num_cols);
-
-    return num_cols * num_rows;
-
-
-
-
-    /*
-    int blocks_assigned_hor, blocks_assigned_vert;
-    if (my_rank == 0 || my_rank == 1) {
-        printf("matrix_cols/block_cols = %d\n", matrix_cols/block_cols);
-        printf("matrix_cols/block_cols mod proc_cols = %d\n", (matrix_cols/block_cols)%proc_cols);
-        printf("(matrix_cols/block_cols)/proc_cols = %d\n", (matrix_cols/block_cols)/proc_cols);
-    }
-
-    if (my_rank < (matrix_cols / block_cols) % proc_cols) {
-        blocks_assigned_hor = (matrix_cols / block_cols)/proc_cols + 1;
-    } else {
-        blocks_assigned_hor = (matrix_cols / block_cols) / proc_cols;
-    }
-
-    if (my_rank == 0 || my_rank == 1) {
-        printf("matrix_rows/block_rows = %d\n", matrix_rows/block_rows);
-        printf("matrix_rows/block_rows mod proc_rows = %d\n", (matrix_rows/block_rows)%proc_rows);
-        printf("(matrix_rows/block_rows)/proc_rows = %d\n", (matrix_rows/block_rows)/proc_rows);
-    }
-
-    if (my_rank < (matrix_rows / block_rows) % proc_rows) {
-        blocks_assigned_vert = (matrix_rows / block_rows)/proc_rows + 1;
-    } else {
-        blocks_assigned_vert = (matrix_rows / block_rows)/proc_rows;
-    }
-
-    printf("[Process %d] Assigned %d blocks on hor\n", my_rank, blocks_assigned_hor);
-    printf("[Process %d] Assigned %d blocks vert\n", my_rank, blocks_assigned_vert);
-    printf("[Process %d] Assigned %d blocks\n", my_rank, blocks_assigned_hor * blocks_assigned_vert);
-
-    return blocks_assigned_hor * blocks_assigned_vert * block_rows * block_cols;
-
-*/
+    return tot_nums_assigned_x * tot_nums_assigned_y;
 
 }
 
@@ -195,9 +151,10 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
 
     printf("\n======\ni = %d\nBlock received : ", rank);
     for (int i = 0; i < matrix_size; i++) {
-        printf("%f ", matrix[i]);
+        printf("%d ", (int)matrix[i]);
     }
     puts("\n");
+    fflush(stdout);
 
 }
 
@@ -213,7 +170,7 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(comm, &my_rank);
 
     float *matrix;
-    block_cyclic_distribution("A.bin", matrix, 12, 12, 3, 3, 3, 2, comm);    
+    block_cyclic_distribution("A.bin", matrix, 25, 19, 3, 2, 2, 4, comm);    
 
     MPI_Finalize();
 }

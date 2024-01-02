@@ -2,14 +2,14 @@
 #include "matrix_gen/matrix_gen.h"
 #include "sequential/sequential_computation.h"
 
-#define ROWS 12
-#define COLS 12
+#define ROWS 25
+#define COLS 19
 
 void print_matrix(int rows, int cols, float **matrix) {
     for (int i = 0; i < rows; i++) {
         puts("\n");
         for (int j = 0; j < cols; j++) {
-            printf("%f ", matrix[i][j]);
+            printf("%d ", (int)matrix[i][j]);
         }
     }
     puts("\n");
@@ -22,9 +22,6 @@ void writeMatrixToFile(const char* filename, float** matrix, int rows, int cols)
         perror("Errore nell'apertura del file");
         return;
     }
-
-    //fwrite(&rows, sizeof(int), 1, file);
-    //fwrite(&cols, sizeof(int), 1, file);
 
     for (int i = 0; i < rows; ++i) {
         fwrite(matrix[i], sizeof(float), cols, file);
