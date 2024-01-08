@@ -113,21 +113,17 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
     psizes[0] = P; /* no. of processes in vertical dimension of process grid */
     psizes[1] = Q; /* no. of processes in horizontal dimension of process grid */
 
-    MPI_Type_create_darray(P * Q, rank, 2, gsizes, distribs, dargs, psizes,
-            MPI_ORDER_C, MPI_FLOAT, &filetype);
+    MPI_Type_create_darray(P * Q, rank, 2, gsizes, distribs, dargs, psizes, MPI_ORDER_C, MPI_FLOAT, &filetype);
     MPI_Type_commit(&filetype);
 
-    MPI_File_open(comm, filename,
-            MPI_MODE_RDONLY,
-            MPI_INFO_NULL, &file);
+    MPI_File_open(comm, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
 
     if (file == MPI_FILE_NULL) {
         fprintf(stderr, "Error in opening file.\n");
         MPI_Abort(comm, 1);
     }
 
-    MPI_File_set_view(file, 0, MPI_FLOAT, filetype, "native",
-            MPI_INFO_NULL);
+    MPI_File_set_view(file, 0, MPI_FLOAT, filetype, "native", MPI_INFO_NULL);
 
     
     matrix_size = compute_submatrix_dimension(rows, cols, block_rows, block_cols, P, Q, rank, size);
@@ -138,17 +134,6 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
 
     MPI_File_close(&file);
 
-    /** 
-     * Transform the 1D array to a 2D array
-     * i.e.: get how many blocks are assigned on this process on the hor axis and on the vert axis,
-     * and compute how many rows and columns are in the process' submatrix.
-     */
-
-    
-
-    /* Extract blocks from array */
-    MPI_Datatype subarray_type; 
-
     printf("\n======\ni = %d\nBlock received : ", rank);
     for (int i = 0; i < matrix_size; i++) {
         printf("%d ", (int)matrix[i]);
@@ -156,6 +141,77 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
     puts("\n");
     fflush(stdout);
 
+}
+
+
+
+// todo test the following function and optimize the code to include everything in a single function
+float *divide_rows(char *filename, float *matrix, int matrix_rows, int matrix_cols, int block_rows, int proc_rows, int proc_cols, MPI_Comm comm) {
+
+    int rank;
+    int size;
+
+    int matrix_size;
+    
+    MPI_Datatype filetype;
+    MPI_File file;
+
+    MPI_Status status;
+
+    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(comm, &rank);
+
+    rank = rank % block_rows;
+
+    int gsizes[2], distribs[2], dargs[2], psizes[2];
+
+    gsizes[0] = matrix_rows; /* rows of the original matrix */
+    gsizes[1] = matrix_cols; /* columns of the original matrix */
+
+    /* block cyclic distribution */
+    distribs[0] = MPI_DISTRIBUTE_CYCLIC;
+    distribs[1] = MPI_DISTRIBUTE_CYCLIC;
+
+    dargs[0] = block_rows; /* x dimension of the block */
+    dargs[1] = matrix_cols; /* y dimension of the block */
+
+    psizes[0] = block_rows; /* no. of processes in vertical dimension of process grid */
+    psizes[1] = 1; /* no. of processes in horizontal dimension of process grid */
+
+    MPI_Type_create_darray(block_rows, rank, 2, gsizes, distribs, dargs, psizes, MPI_ORDER_C, MPI_FLOAT, &filetype);
+    MPI_Type_commit(&filetype);
+
+    MPI_File_open(comm, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
+
+    if (file == MPI_FILE_NULL) {
+        fprintf(stderr, "Error in opening file.\n");
+        MPI_Abort(comm, 1);
+    }
+
+    MPI_File_set_view(file, 0, MPI_FLOAT, filetype, "native", MPI_INFO_NULL);
+
+    
+    int num_rows = matrix_rows / proc_rows;
+    /* number of rows that this process will get */
+    
+    if (rank < matrix_rows % proc_rows) {
+        num_rows++;
+    }
+    
+    matrix_size = num_rows*matrix_cols;
+
+    matrix = (float*) malloc(matrix_size * sizeof(float));
+    MPI_File_read_all(file, matrix, matrix_size,
+            MPI_FLOAT, &status);
+
+    MPI_File_close(&file);
+
+    printf("\n======\ni = %d\nBlock received : ", rank);
+    for (int i = 0; i < matrix_size; i++) {
+        printf("%d ", (int)matrix[i]);
+    }
+    puts("\n");
+    fflush(stdout);
 }
 
 int main(int argc, char** argv) {
@@ -169,8 +225,10 @@ int main(int argc, char** argv) {
     MPI_Comm_size(comm, &n_proc);
     MPI_Comm_rank(comm, &my_rank);
 
-    float *matrix;
-    block_cyclic_distribution("A.bin", matrix, 25, 19, 3, 2, 2, 4, comm);    
+    float *A;
+    //block_cyclic_distribution("A.bin", A, 12, 12, 3, 2, 3, 2, comm);
+    float *B;
+    divide_rows("B.bin", B, 12, 12, 2, 2, 1, comm);    
 
     MPI_Finalize();
 }
