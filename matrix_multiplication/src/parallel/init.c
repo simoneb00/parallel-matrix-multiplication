@@ -15,20 +15,18 @@
 /// @param proc_rows Number of rows of the process grid
 /// @param proc_cols Number of columns of the process grid
 /// @return Number of floats the process should allocate to receive its portion of the matrix
-int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows, int block_cols, int proc_rows, int proc_cols, int my_rank, int size) {
+int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows, int block_cols, 
+            int proc_rows, int proc_cols, int my_rank, int *num_rows, int *num_cols) {
 
     int my_rank_coord_x, my_rank_coord_y;
 
     my_rank_coord_x = my_rank / proc_cols;
-    my_rank_coord_y = my_rank % proc_cols; 
-
-    //printf("[Process %d] my coordinates are (%d, %d)\n", my_rank, my_rank_coord_x, my_rank_coord_y);
-    
+    my_rank_coord_y = my_rank % proc_cols;     
 
     /* COLS */
-    int tot_num_blocks = ceil((float)matrix_cols / (float)block_cols); // 12 / 3 = 4
+    int tot_num_blocks = ceil((float)matrix_cols / (float)block_cols); 
 
-    int tot_blocks_assigned = tot_num_blocks / proc_cols; // 4 / 2 = 2
+    int tot_blocks_assigned = tot_num_blocks / proc_cols;
 
     if (tot_num_blocks % proc_cols != 0 && my_rank_coord_y < tot_num_blocks % proc_cols) {
             tot_blocks_assigned++;
@@ -36,7 +34,7 @@ int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows
 
     /* assign last block portion */
 
-    int tot_nums_assigned_x = tot_blocks_assigned * block_cols; // 2 * 3 = 6
+    int tot_nums_assigned_x = tot_blocks_assigned * block_cols;
 
     int last_process_x = tot_num_blocks % proc_cols == 0 ? proc_cols -1 : (tot_num_blocks % proc_cols) -1;
     if (my_rank_coord_y == last_process_x && matrix_cols % block_cols != 0) {
@@ -44,10 +42,9 @@ int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows
     }
 
     /* ROWS */ 
-    // my_rank_coord_x = 1 
-    tot_num_blocks = ceil((float)matrix_rows / (float)block_rows);    // 25 / 3 = 9
+    tot_num_blocks = ceil((float)matrix_rows / (float)block_rows);
 
-    tot_blocks_assigned = tot_num_blocks / proc_rows;   // 9 / 3 = 3
+    tot_blocks_assigned = tot_num_blocks / proc_rows; 
 
     if (tot_num_blocks % proc_rows != 0 && my_rank_coord_x < tot_num_blocks % proc_rows) {
             tot_blocks_assigned++;
@@ -55,35 +52,43 @@ int compute_submatrix_dimension(int matrix_rows, int matrix_cols, int block_rows
 
     /* assign last block portion */
 
-    int tot_nums_assigned_y = tot_blocks_assigned * block_rows; // 3 * 3 = 9
+    int tot_nums_assigned_y = tot_blocks_assigned * block_rows; 
 
-    int last_process_y = ((tot_num_blocks % proc_rows) == 0) ? (proc_rows -1) : ((tot_num_blocks % proc_rows) -1);  // 2
+    int last_process_y = ((tot_num_blocks % proc_rows) == 0) ? (proc_rows -1) : ((tot_num_blocks % proc_rows) -1);  
     if (my_rank_coord_x == last_process_y && matrix_rows % block_rows != 0) {
         tot_nums_assigned_y -= (block_rows - (matrix_rows % block_rows));
     }
 
+    *num_rows = tot_nums_assigned_y;
+    *num_cols = tot_nums_assigned_x;
+
+    #ifdef DEBUG
     printf("[Process %d] Assigned %d rows\n", my_rank, tot_nums_assigned_y);
     printf("[Process %d] Assigned %d cols\n", my_rank, tot_nums_assigned_x);
     printf("[Process %d] Assigned %d elements\n", my_rank, tot_nums_assigned_y * tot_nums_assigned_x);
     puts("");
+    #endif
 
     return tot_nums_assigned_x * tot_nums_assigned_y;
 
 }
 
-/// @brief This function divides the matrices A, B and C between n_proc processes, according to a block-cyclic distribution.
-/// @param A m x k matrix
-/// @param B k x n matrix
-/// @param C m x n matrix
-/// @param n_proc number of processes to divide the matrices between
-/// @param m matrix dimension
-/// @param k matrix dimension
-/// @param n matrix dimension
-void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols, 
-        int block_rows, int block_cols, int P, int Q, MPI_Comm comm) {
+/// @brief This function divides the matrices A between all the processes, according to a block-cyclic distribution.
+/// @param filename Filename of the matrix binary file 
+/// @param matrix Float array that will contain the submatrix
+/// @param rows Number of rows of the matrix
+/// @param cols Number of columns of the matrix
+/// @param block_rows Number of rows of the block
+/// @param block_cols Number of columns of the block
+/// @param proc_rows Number of rows of the process grid
+/// @param proc_cols Number of columns of the process grid
+/// @param num_rows Number of rows of the original matrix assigned to the process
+/// @param num_cols Number of columns of the original matrix assigned to the process
+/// @param comm MPI communicator
+float *block_cyclic_distribution(char *filename, float *matrix, int rows, int cols, 
+        int block_rows, int block_cols, int proc_rows, int proc_cols, int *num_rows, int *num_cols, MPI_Comm comm) {
 
     int rank;
-    int size;
 
     int matrix_size;
     
@@ -92,7 +97,6 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
 
     MPI_Status status;
 
-    MPI_Comm_size(comm, &size);
     MPI_Comm_rank(comm, &rank);
 
     /**
@@ -110,10 +114,10 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
     dargs[0] = block_rows; /* x dimension of the block */
     dargs[1] = block_cols; /* y dimension of the block */
 
-    psizes[0] = P; /* no. of processes in vertical dimension of process grid */
-    psizes[1] = Q; /* no. of processes in horizontal dimension of process grid */
+    psizes[0] = proc_rows; /* no. of processes in vertical dimension of process grid */
+    psizes[1] = proc_cols; /* no. of processes in horizontal dimension of process grid */
 
-    MPI_Type_create_darray(P * Q, rank, 2, gsizes, distribs, dargs, psizes, MPI_ORDER_C, MPI_FLOAT, &filetype);
+    MPI_Type_create_darray(proc_rows * proc_cols, rank, 2, gsizes, distribs, dargs, psizes, MPI_ORDER_C, MPI_FLOAT, &filetype);
     MPI_Type_commit(&filetype);
 
     MPI_File_open(comm, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
@@ -126,30 +130,45 @@ void block_cyclic_distribution(char *filename, float *matrix, int rows, int cols
     MPI_File_set_view(file, 0, MPI_FLOAT, filetype, "native", MPI_INFO_NULL);
 
     
-    matrix_size = compute_submatrix_dimension(rows, cols, block_rows, block_cols, P, Q, rank, size);
+    matrix_size = compute_submatrix_dimension(rows, cols, block_rows, block_cols, proc_rows, proc_cols, rank, num_rows, num_cols);
 
-    matrix = (float*) malloc(matrix_size * sizeof(float));
+    matrix = (float*) calloc(matrix_size, sizeof(float));
+    if (matrix == NULL) {
+        fprintf(stderr, "memory allocation failed");
+        return NULL;
+    }
     MPI_File_read_all(file, matrix, matrix_size,
             MPI_FLOAT, &status);
 
     MPI_File_close(&file);
 
+    #ifdef DEBUG
     printf("\n======\ni = %d\nBlock received : ", rank);
     for (int i = 0; i < matrix_size; i++) {
         printf("%d ", (int)matrix[i]);
     }
     puts("\n");
     fflush(stdout);
+    #endif
+
+    return matrix;
 
 }
 
 
-
-// todo test the following function and optimize the code to include everything in a single function
-float *divide_rows(char *filename, float *matrix, int matrix_rows, int matrix_cols, int block_rows, int proc_rows, int proc_cols, MPI_Comm comm) {
+/// @brief This function assigns the rows of B to the processes, according to a block-cyclic distribution.
+/// @param filename Filename of the binary file containing B
+/// @param matrix  Float array that will contain the submatrix
+/// @param matrix_rows Rows of B
+/// @param matrix_cols Columns of B
+/// @param block_rows Rows of the block
+/// @param proc_rows Rows of the process grid
+/// @param num_rows Number of rows that the current process should get 
+/// @param comm MPI communicator
+float *divide_rows(char *filename, float *matrix, int matrix_rows, int matrix_cols, 
+                    int block_rows, int proc_rows, int num_rows, MPI_Comm comm) {
 
     int rank;
-    int size;
 
     int matrix_size;
     
@@ -158,10 +177,9 @@ float *divide_rows(char *filename, float *matrix, int matrix_rows, int matrix_co
 
     MPI_Status status;
 
-    MPI_Comm_size(comm, &size);
     MPI_Comm_rank(comm, &rank);
 
-    rank = rank % block_rows;
+    int rank_norm = rank % proc_rows;
 
     int gsizes[2], distribs[2], dargs[2], psizes[2];
 
@@ -172,13 +190,13 @@ float *divide_rows(char *filename, float *matrix, int matrix_rows, int matrix_co
     distribs[0] = MPI_DISTRIBUTE_CYCLIC;
     distribs[1] = MPI_DISTRIBUTE_CYCLIC;
 
-    dargs[0] = block_rows; /* x dimension of the block */
-    dargs[1] = matrix_cols; /* y dimension of the block */
+    dargs[0] = block_rows; /* rows of the block */
+    dargs[1] = matrix_cols; /* columns of the block */
 
-    psizes[0] = block_rows; /* no. of processes in vertical dimension of process grid */
-    psizes[1] = 1; /* no. of processes in horizontal dimension of process grid */
+    psizes[0] = proc_rows; /* no. of processes in vertical dimension of process grid */
+    psizes[1] = 1; /* no. of processes in horizontal dimension of process grid (1, because every process in the same row gets the same rows of the original matrix) */
 
-    MPI_Type_create_darray(block_rows, rank, 2, gsizes, distribs, dargs, psizes, MPI_ORDER_C, MPI_FLOAT, &filetype);
+    MPI_Type_create_darray(proc_rows, rank_norm, 2, gsizes, distribs, dargs, psizes, MPI_ORDER_C, MPI_FLOAT, &filetype);
     MPI_Type_commit(&filetype);
 
     MPI_File_open(comm, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
@@ -189,32 +207,130 @@ float *divide_rows(char *filename, float *matrix, int matrix_rows, int matrix_co
     }
 
     MPI_File_set_view(file, 0, MPI_FLOAT, filetype, "native", MPI_INFO_NULL);
-
-    
-    int num_rows = matrix_rows / proc_rows;
-    /* number of rows that this process will get */
-    
-    if (rank < matrix_rows % proc_rows) {
-        num_rows++;
-    }
     
     matrix_size = num_rows*matrix_cols;
 
-    matrix = (float*) malloc(matrix_size * sizeof(float));
+    matrix = (float*) calloc(matrix_size, sizeof(float));
+    if (matrix == NULL) {
+        fprintf(stderr, "memory allocation failed");
+        return NULL;
+    }
     MPI_File_read_all(file, matrix, matrix_size,
             MPI_FLOAT, &status);
 
     MPI_File_close(&file);
 
+    #ifdef DEBUG
     printf("\n======\ni = %d\nBlock received : ", rank);
     for (int i = 0; i < matrix_size; i++) {
         printf("%d ", (int)matrix[i]);
     }
     puts("\n");
     fflush(stdout);
+    #endif
+
+    return matrix;
 }
 
+
+/// @brief This function computes the matrix multiplication between A and B, and saves the result in the array C_temp.
+float *multiplyMatrices(float *A, int A_rows, int A_cols, float *B, int B_rows, int B_cols, float *C_temp, int rank) {
+    
+    if (A_cols != B_rows) {
+        fprintf(stderr, "The number of columns in A must be equal to the number of rows in B.\n");
+        return NULL;
+    }
+
+
+
+    C_temp = (float *)calloc(A_rows * B_cols, sizeof(float));
+    if (C_temp == NULL) {
+        fprintf(stderr, "C_temp allocation failed");
+        return NULL;
+    }
+
+    for (int i = 0; i < A_rows; ++i) {
+        for (int j = 0; j < B_cols; ++j) {
+            for (int k = 0; k < A_cols; ++k) {
+                C_temp[i * B_cols + j] += A[i * A_cols + k] * B[k * B_cols + j];
+            }
+        }
+    }
+
+    if (rank == 4) {
+        printf("\n[Process 4] Printing the matrix C (%dx%d)\n", A_rows, B_cols);
+        for (int i = 0; i < A_rows; i++) {
+            puts("");
+            for (int j = 0; j < B_cols; j++) {
+                printf("%d ", (int)C_temp[i*B_cols + j]);
+            }
+        }
+        puts("");
+        fflush(stdout);
+    }
+
+    return C_temp;
+}
+
+
+void send_matrix_to_root(float *matrix, int num_rows, int num_cols, int rank, int proc_rows, int proc_cols, MPI_Comm comm) {
+    
+    /*
+    *   E.g.: 
+            Process grid:
+            0 1 2 3 4
+            5 6 7 8 9
+
+            the processes 0, 1, 2, 3, 4 will send their C_temp to process 0 (1/5 = 2/5 = 3/5 = 4/5 = 0)
+            the processes 5, 6, 7, 8, 9 will send their C_temp to process 1 (6/5 = 7/5 = 8/5 = 9/5 = 1)
+            the processes 0 and 5 are the receivers
+    */
+
+    int row_index = rank / proc_cols;           // this is the index of the row of the process grid in which the current process is located
+    int root_process = row_index * proc_cols;   // this is the index of the first process in the same row in which the current process is located
+
+    /* There will be a group for each row in the process grid (so, proc_rows groups).
+    *  We're gonna create a new communicator for each group, having color equals to the row index.
+    */
+    MPI_Comm group_comm;
+    MPI_Comm_split(comm, row_index, rank, &group_comm);    // the processes on the same row will be assigned to the same group
+
+    // this array will contain the element-wise sum of all the C_temp matrices belonging to the processes in the same group
+    float *result = (float *)calloc(num_rows * num_cols, sizeof(float));  
+    if (result == NULL) {
+        fprintf(stderr, "result allocation failed");
+        return;
+    }
+
+    MPI_Reduce(matrix, result, num_rows*num_cols, MPI_FLOAT, MPI_SUM, 0, group_comm);
+
+    MPI_Barrier(group_comm);    // sync barrier
+
+
+
+    if (rank == 0)  {
+        printf("\n[Process %d] Printing the resulting matrix C_temp (%dx%d)\n", rank, num_rows, num_cols);
+        for (int i = 0; i < num_rows; i++) {
+            puts("");
+            for (int j = 0; j < num_cols; j++) {
+                printf("%d ", (int)result[i*num_cols + j]);
+            }
+        }
+        fflush(stdout);
+    }
+
+}
+
+
 int main(int argc, char** argv) {
+
+    int A_rows = 17;
+    int A_cols = 23;
+    int B_rows = 23;
+    int B_cols = 17;
+
+    int proc_rows = 2;
+    int proc_cols = 5;
 
     int n_proc, my_rank;
     MPI_Comm comm;
@@ -225,10 +341,57 @@ int main(int argc, char** argv) {
     MPI_Comm_size(comm, &n_proc);
     MPI_Comm_rank(comm, &my_rank);
 
-    float *A;
-    //block_cyclic_distribution("A.bin", A, 12, 12, 3, 2, 3, 2, comm);
-    float *B;
-    divide_rows("B.bin", B, 12, 12, 2, 2, 1, comm);    
+    int num_rows;
+    int num_cols;
+    float *A = block_cyclic_distribution("A.bin", A, A_rows, A_cols, 3, 3, proc_rows, proc_cols, &num_rows, &num_cols, comm);
+
+    printf("[Process %d] Got %d elements\n", my_rank, num_rows * num_cols);
+
+    float *B = divide_rows("B.bin", B, B_rows, B_cols, 3, proc_cols, num_cols, comm);    
+
+    float *C_temp = multiplyMatrices(A, num_rows, num_cols, B, num_cols, B_cols, C_temp, my_rank);
+
+
+    /* every process sends its C_temp matrix to the first process (say root process) in the same row, in the process grid */
+    //send_matrix_to_root(C_temp, num_rows, B_cols, my_rank, proc_rows, proc_cols, comm);
+
+
+    if (my_rank == 4) {
+        printf("\n[Process %d] Printing the matrix A (%dx%d)\n", my_rank, num_rows, num_cols);
+        for (int i = 0; i < num_rows; i++) {
+            puts("");
+            for (int j = 0; j < num_cols; j++) {
+                printf("%d ", (int)A[i*num_cols + j]);
+            }
+        }
+        puts("");
+        fflush(stdout);
+
+        printf("\n[Process %d] Printing the matrix B (%dx%d)\n", my_rank, num_cols, B_cols);
+        for (int i = 0; i < num_cols; i++) {
+            puts("");
+            for (int j = 0; j < B_cols; j++) {
+                printf("%d ", (int)B[i*B_cols + j]);
+            }
+        }
+        puts("");
+        fflush(stdout);
+
+        printf("\n[Process %d] Printing the matrix C (%dx%d)\n", my_rank, num_rows, B_cols);
+        for (int i = 0; i < num_rows; i++) {
+            puts("");
+            for (int j = 0; j < B_cols; j++) {
+                printf("%d ", (int)C_temp[i*B_cols + j]);
+            }
+        }
+        puts("");
+        fflush(stdout);
+    }
+
+    
+    free(A);
+    free(B);
+    free(C_temp);
 
     MPI_Finalize();
 }
