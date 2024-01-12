@@ -17,7 +17,7 @@ void compute_sequential(float **A, float **B, float **C, int m, int k, int n) {
         }
     }
 
-    #ifdef DEBUG
+    //#ifdef DEBUG
     printf("\nResult:\n");
     for (int i = 0; i < m; i++) {
         puts("\n");
@@ -26,5 +26,5 @@ void compute_sequential(float **A, float **B, float **C, int m, int k, int n) {
         }
     }
     puts("\n");
-    #endif
+    //#endif
 }

@@ -1,11 +1,9 @@
 #include <stdio.h>
 #include "matrix_gen/matrix_gen.h"
 #include "sequential/sequential_computation.h"
-
-#define ROWS_B 23
-#define COLS_B 17
-#define ROWS_A 17
-#define COLS_A 23
+#include "sequential/matrix_comparison/matrix_comparison.h"
+#include "utils/matrix_file_rw/matrix_rw.h"
+#include <stdlib.h>
 
 void print_matrix(int rows, int cols, float **matrix) {
     for (int i = 0; i < rows; i++) {
@@ -17,32 +15,35 @@ void print_matrix(int rows, int cols, float **matrix) {
     puts("\n");
 }
 
-void writeMatrixToFile(const char* filename, float** matrix, int rows, int cols) {
-    FILE* file = fopen(filename, "wb"); 
-
-    if (file == NULL) {
-        perror("Errore nell'apertura del file");
-        return;
-    }
-
-    for (int i = 0; i < rows; ++i) {
-        fwrite(matrix[i], sizeof(float), cols, file);
-    }
-
-    fclose(file);
-}
-
 int main(int argc, char *argv[]) {
-    float **A = generate_random_matrix(ROWS_A, COLS_A, 12345);
-    writeMatrixToFile("A.bin", A, ROWS_A, COLS_A);
-    float **B = generate_random_matrix(ROWS_B, COLS_B, 54321);
-    writeMatrixToFile("B.bin", B, ROWS_B, COLS_B);
-    //float **C = generate_random_matrix(ROWS, COLS, 14235);
-    //writeMatrixToFile("C.bin", C, ROWS, COLS);
 
-    printf("Matrix A:\n");
-    print_matrix(ROWS_A, COLS_A, A);
-    printf("Matrix B:\n");
-    print_matrix(ROWS_B, COLS_B, B);
-    //compute_sequential(A, B, C, ROWS, ROWS, ROWS);
+    if (argc != 4) {
+        fprintf(stderr, "Usage: ./matrix_multiplication m k n\n");
+        return 1;
+    }
+
+    int A_rows = atoi(argv[1]);
+    int A_cols = atoi(argv[2]);
+    int B_rows = A_cols;
+    int B_cols = atoi(argv[3]); 
+    
+    float **A;
+    read_matrix_from_file("A.bin", &A, A_rows, A_cols);
+    float **B;
+    read_matrix_from_file("B.bin", &B, B_rows, B_cols);
+    float **C;
+    read_matrix_from_file("C.bin", &C, A_rows, B_cols);
+    
+    compute_sequential(A, B, C, A_rows, A_cols, B_cols);
+    
+
+    float **res_matrix;
+    read_matrix_from_file("parallel_result.bin", &res_matrix, A_rows, B_cols);
+
+    float **comparison = compare_matrices(C, res_matrix, A_rows, B_cols);
+    printf("Comparison:\n");
+    print_matrix(A_rows, B_cols, comparison);
+
+
+    return 0;
 }

@@ -257,23 +257,11 @@ float *multiplyMatrices(float *A, int A_rows, int A_cols, float *B, int B_rows, 
         }
     }
 
-    if (rank == 4) {
-        printf("\n[Process 4] Printing the matrix C (%dx%d)\n", A_rows, B_cols);
-        for (int i = 0; i < A_rows; i++) {
-            puts("");
-            for (int j = 0; j < B_cols; j++) {
-                printf("%d ", (int)C_temp[i*B_cols + j]);
-            }
-        }
-        puts("");
-        fflush(stdout);
-    }
-
     return C_temp;
 }
 
 
-void send_matrix_to_root(float *matrix, int num_rows, int num_cols, int rank, int proc_rows, int proc_cols, MPI_Comm comm) {
+void *send_matrix_to_root(float *matrix, int num_rows, int num_cols, int rank, int proc_rows, int proc_cols, MPI_Comm comm) {
     
     /*
     *   E.g.: 
@@ -299,16 +287,18 @@ void send_matrix_to_root(float *matrix, int num_rows, int num_cols, int rank, in
     float *result = (float *)calloc(num_rows * num_cols, sizeof(float));  
     if (result == NULL) {
         fprintf(stderr, "result allocation failed");
-        return;
+        return NULL;
     }
 
     MPI_Reduce(matrix, result, num_rows*num_cols, MPI_FLOAT, MPI_SUM, 0, group_comm);
 
     MPI_Barrier(group_comm);    // sync barrier
 
+    #ifdef DEBUG
+    int group_rank;
+    MPI_Comm_rank(group_comm, &group_rank);
 
-
-    if (rank == 0)  {
+    if (group_rank == 0)  {
         printf("\n[Process %d] Printing the resulting matrix C_temp (%dx%d)\n", rank, num_rows, num_cols);
         for (int i = 0; i < num_rows; i++) {
             puts("");
@@ -316,10 +306,59 @@ void send_matrix_to_root(float *matrix, int num_rows, int num_cols, int rank, in
                 printf("%d ", (int)result[i*num_cols + j]);
             }
         }
+        puts("");
         fflush(stdout);
     }
+    #endif
 
+    return result;
 }
+
+
+void write_result_to_file(char *filename, float *result, int result_len, int rank, int matrix_rows, int matrix_cols, int block_rows, int proc_rows, int proc_cols, MPI_Comm comm) {
+    
+    printf("[Process %d] Trying to write result (length %d) on the resulting matrix (%dx%d) file\n", rank, result_len, matrix_rows, matrix_cols);
+
+    MPI_Datatype filetype;
+    MPI_File file;
+
+    MPI_Status status;
+
+    int rank_norm = rank / proc_cols;
+    printf("[Process %d] rank_norm: %d\n", rank, rank_norm);
+
+    int gsizes[2], distribs[2], dargs[2], psizes[2];
+
+    gsizes[0] = matrix_rows; /* rows of the original matrix */
+    gsizes[1] = matrix_cols; /* columns of the original matrix */
+
+    /* block cyclic distribution */
+    distribs[0] = MPI_DISTRIBUTE_CYCLIC;
+    distribs[1] = MPI_DISTRIBUTE_CYCLIC;
+
+    dargs[0] = block_rows; /* rows of the block */
+    dargs[1] = matrix_cols; /* columns of the block */
+
+    psizes[0] = proc_rows; /* no. of processes in vertical dimension of process grid */
+    psizes[1] = 1; /* no. of processes in horizontal dimension of process grid (1, because every process in the same row gets the same rows of the original matrix) */
+
+    MPI_Type_create_darray(proc_rows, rank_norm, 2, gsizes, distribs, dargs, psizes, MPI_ORDER_C, MPI_FLOAT, &filetype);
+    MPI_Type_commit(&filetype);
+    
+    MPI_File_open(comm, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &file);
+
+    if (file == MPI_FILE_NULL) {
+        fprintf(stderr, "Error in opening file.\n");
+        MPI_Abort(comm, 1);
+    }
+
+    MPI_File_set_view(file, 0, MPI_FLOAT, filetype, "native", MPI_INFO_NULL);
+    
+    MPI_File_write_all(file, result, result_len, MPI_FLOAT, &status);
+
+    MPI_File_close(&file);
+}
+
 
 
 int main(int argc, char** argv) {
@@ -328,9 +367,14 @@ int main(int argc, char** argv) {
     int A_cols = 23;
     int B_rows = 23;
     int B_cols = 17;
+    int result_rows = A_rows;
+    int result_cols = B_cols;
 
     int proc_rows = 2;
     int proc_cols = 5;
+
+    int block_rows = 3;
+    int block_cols = 3;
 
     int n_proc, my_rank;
     MPI_Comm comm;
@@ -343,51 +387,64 @@ int main(int argc, char** argv) {
 
     int num_rows;
     int num_cols;
-    float *A = block_cyclic_distribution("A.bin", A, A_rows, A_cols, 3, 3, proc_rows, proc_cols, &num_rows, &num_cols, comm);
+    float *A = block_cyclic_distribution("A.bin", A, A_rows, A_cols, block_rows, block_cols, proc_rows, proc_cols, &num_rows, &num_cols, comm);
 
+    #ifdef DEBUG
     printf("[Process %d] Got %d elements\n", my_rank, num_rows * num_cols);
+    #endif
 
-    float *B = divide_rows("B.bin", B, B_rows, B_cols, 3, proc_cols, num_cols, comm);    
+    float *B = divide_rows("B.bin", B, B_rows, B_cols, block_rows, proc_cols, num_cols, comm);    
 
     float *C_temp = multiplyMatrices(A, num_rows, num_cols, B, num_cols, B_cols, C_temp, my_rank);
 
 
     /* every process sends its C_temp matrix to the first process (say root process) in the same row, in the process grid */
-    //send_matrix_to_root(C_temp, num_rows, B_cols, my_rank, proc_rows, proc_cols, comm);
+    float *result = send_matrix_to_root(C_temp, num_rows, B_cols, my_rank, proc_rows, proc_cols, comm);
 
-
-    if (my_rank == 4) {
-        printf("\n[Process %d] Printing the matrix A (%dx%d)\n", my_rank, num_rows, num_cols);
-        for (int i = 0; i < num_rows; i++) {
-            puts("");
-            for (int j = 0; j < num_cols; j++) {
-                printf("%d ", (int)A[i*num_cols + j]);
-            }
-        }
+    #ifdef DEBUG
+    printf("\n[Process %d] Printing the matrix A (%dx%d)\n", my_rank, num_rows, num_cols);
+    for (int i = 0; i < num_rows; i++) {
         puts("");
-        fflush(stdout);
-
-        printf("\n[Process %d] Printing the matrix B (%dx%d)\n", my_rank, num_cols, B_cols);
-        for (int i = 0; i < num_cols; i++) {
-            puts("");
-            for (int j = 0; j < B_cols; j++) {
-                printf("%d ", (int)B[i*B_cols + j]);
-            }
+        for (int j = 0; j < num_cols; j++) {
+            printf("%d ", (int)A[i*num_cols + j]);
         }
-        puts("");
-        fflush(stdout);
-
-        printf("\n[Process %d] Printing the matrix C (%dx%d)\n", my_rank, num_rows, B_cols);
-        for (int i = 0; i < num_rows; i++) {
-            puts("");
-            for (int j = 0; j < B_cols; j++) {
-                printf("%d ", (int)C_temp[i*B_cols + j]);
-            }
-        }
-        puts("");
-        fflush(stdout);
     }
+    puts("");
+    fflush(stdout);
 
+    printf("\n[Process %d] Printing the matrix B (%dx%d)\n", my_rank, num_cols, B_cols);
+    for (int i = 0; i < num_cols; i++) {
+        puts("");
+        for (int j = 0; j < B_cols; j++) {
+            printf("%d ", (int)B[i*B_cols + j]);
+        }
+    }
+    puts("");
+    fflush(stdout);
+
+    printf("\n[Process %d] Printing the matrix C (%dx%d)\n", my_rank, num_rows, B_cols);
+    for (int i = 0; i < num_rows; i++) {
+        puts("");
+        for (int j = 0; j < B_cols; j++) {
+            printf("%d ", (int)C_temp[i*B_cols + j]);
+        }
+    }
+    puts("");
+    fflush(stdout);
+    #endif
+
+    MPI_Barrier(comm);
+
+    MPI_Comm root_comm;
+    MPI_Comm_split(comm, my_rank % proc_cols, my_rank, &root_comm);
+
+    int root_rank;
+    MPI_Comm_rank(root_comm, &root_rank);
+
+    /* Write result on file */
+    if (my_rank % proc_cols == 0) {
+        write_result_to_file("parallel_result.bin", result, num_rows * B_cols, my_rank, result_rows, result_cols, block_rows, proc_rows, proc_cols, root_comm);
+    }
     
     free(A);
     free(B);
@@ -395,3 +452,4 @@ int main(int argc, char** argv) {
 
     MPI_Finalize();
 }
+ 
