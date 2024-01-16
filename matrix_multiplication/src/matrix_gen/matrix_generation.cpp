@@ -25,14 +25,6 @@ float **generate_random_matrix(int rows, int cols, int seed, int zero_matrix)
             }
         }
 
-        /*
-        // Deallocazione della matrice dalla heap
-        for (int i = 0; i < rows; ++i) {
-            delete[] matrix[i];
-        }
-        delete[] matrix;
-        */
-
         printf("Matrix successfully generated\n");
 
         return matrix;
@@ -49,18 +41,17 @@ float **generate_random_matrix(int rows, int cols, int seed, int zero_matrix)
             }
         }
 
-        /*
-        // Deallocazione della matrice dalla heap
-        for (int i = 0; i < rows; ++i) {
-            delete[] matrix[i];
-        }
-        delete[] matrix;
-        */
-
         printf("Matrix successfully generated\n");
 
         return matrix;
     }
+}
+
+void deallocate_matrix(float **matrix, int rows) {
+    for (int i = 0; i < rows; ++i) {
+            delete[] matrix[i];
+        }
+        delete[] matrix;
 }
 
 int main(int argc, char *argv[]) {
@@ -77,10 +68,13 @@ int main(int argc, char *argv[]) {
     
     float **A = generate_random_matrix(A_rows, A_cols, 12345, 0);
     writeMatrixToFile("A.bin", A, A_rows, A_cols);
+    deallocate_matrix(A, A_rows);
     float **B = generate_random_matrix(B_rows, B_cols, 54321, 0);
     writeMatrixToFile("B.bin", B, B_rows, B_cols);
+    deallocate_matrix(B, B_rows);
     float **C = generate_random_matrix(A_rows, B_cols, 14235, 1);
     writeMatrixToFile("C.bin", C, A_rows, B_cols);
+    deallocate_matrix(C, A_rows);
     
     return 0;
 }

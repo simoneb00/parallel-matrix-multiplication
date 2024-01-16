@@ -14,11 +14,11 @@ UTILS_DIR = ${SRC_DIR}/utils
 
 all: sequential
 
-sequential: main matrix_comparison matrix_rw
+sequential: main matrix_comparison matrix_utils max_error
 	@echo
 	@echo "Compiling for sequential execution"
 	${CC} -c ${CFLAGS} ${SEQUENTIAL_COMP_DIR}/sequential_computation.c -o sequential_computation.o
-	${CC} -pg ${CFLAGS} main.o sequential_computation.o matrix_comparison.o matrix_rw.o -o matrix_multiplication
+	${CC} -pg ${CFLAGS} main.o sequential_computation.o matrix_comparison.o matrix_rw.o print_matrix.o compute_max_error.o -o matrix_multiplication
 	rm *.o
 	@echo "Compilation successful"
 	@echo
@@ -28,7 +28,7 @@ parallel:
 	@echo "Compiling for parallel execution"
 	mpicc -lm ${CFLAGS} ${PARALLEL_COMP_DIR}/init.c -o parallel_computation
 
-matrix_generation: matrix_rw
+matrix_generation: matrix_utils
 	@echo
 	@echo "Compiling for matrices generation"
 	${CC} ${CFLAGS} -c ${MATRIX_GEN_DIR}/matrix_generation.cpp -o matrix_generation.o
@@ -43,9 +43,12 @@ main:
 matrix_comparison:
 	${CC} ${CFLAGS} -c ${MATRIX_COMPARISON_DIR}/matrix_comparison.c -o matrix_comparison.o
 
-matrix_rw:
+matrix_utils:
 	${CC} ${CFLAGS} -c ${UTILS_DIR}/matrix_file_rw/matrix_rw.c -o matrix_rw.o
+	${CC} ${CFLAGS} -c ${UTILS_DIR}/print_matrix/print_matrix.c -o print_matrix.o
 
+max_error:
+	${CC} ${CFLAGS} -c ${UTILS_DIR}/compute_max_error/compute_max_error.c -o compute_max_error.o
 
 clean:
 	@echo

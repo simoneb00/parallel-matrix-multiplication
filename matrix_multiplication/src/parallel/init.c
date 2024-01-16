@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <errno.h>
 
 /// @brief This function computes how many values should be assigned to every process: 
 ///        it determines the max number of blocks that can be assigned to a process, by computing how many blocks
@@ -236,18 +237,21 @@ float *divide_rows(char *filename, float *matrix, int matrix_rows, int matrix_co
 /// @brief This function computes the matrix multiplication between A and B, and saves the result in the array C_temp.
 float *multiplyMatrices(float *A, int A_rows, int A_cols, float *B, int B_rows, int B_cols, float *C_temp, int rank) {
     
+    double start, end;
+
     if (A_cols != B_rows) {
         fprintf(stderr, "The number of columns in A must be equal to the number of rows in B.\n");
         return NULL;
     }
-
-
 
     C_temp = (float *)calloc(A_rows * B_cols, sizeof(float));
     if (C_temp == NULL) {
         fprintf(stderr, "C_temp allocation failed");
         return NULL;
     }
+
+    start = MPI_Wtime();
+    printf("[Process %d] Multiplying a matrix %dx%d\n", rank, A_rows, B_cols);
 
     for (int i = 0; i < A_rows; ++i) {
         for (int j = 0; j < B_cols; ++j) {
@@ -256,6 +260,10 @@ float *multiplyMatrices(float *A, int A_rows, int A_cols, float *B, int B_rows, 
             }
         }
     }
+
+    end = MPI_Wtime();
+
+    printf("[Process %d] Tempo di ciclo nella moltiplicazione = %f\n", rank, end-start);
 
     return C_temp;
 }
@@ -363,21 +371,21 @@ void write_result_to_file(char *filename, float *result, int result_len, int ran
 
 int main(int argc, char** argv) {
 
-    int A_rows = 17;
-    int A_cols = 23;
-    int B_rows = 23;
-    int B_cols = 17;
-    int result_rows = A_rows;
-    int result_cols = B_cols;
+    int A_rows;
+    int A_cols;
+    int B_rows;
+    int B_cols;
 
-    int proc_rows = 2;
-    int proc_cols = 5;
+    int proc_rows;
+    int proc_cols;
 
-    int block_rows = 3;
-    int block_cols = 3;
+    int block_rows;
+    int block_cols;
 
     int n_proc, my_rank;
     MPI_Comm comm;
+
+    double start, end;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_dup(MPI_COMM_WORLD, &comm);
@@ -385,8 +393,26 @@ int main(int argc, char** argv) {
     MPI_Comm_size(comm, &n_proc);
     MPI_Comm_rank(comm, &my_rank);
 
+    FILE *file  = fopen("src/parallel/config.txt", "r");
+    if (file == NULL) {
+        perror("Errore durante l'apertura del file");
+        return 1;
+    }
+    fscanf(file, "%d %d", &A_rows, &A_cols);
+    fscanf(file, "%d %d", &B_rows, &B_cols);
+    fscanf(file, "%d %d", &proc_rows, &proc_cols);
+    fscanf(file, "%d %d", &block_rows, &block_cols);
+    fclose(file);
+
+    int result_rows = A_rows;
+    int result_cols = B_cols;
+
+    MPI_Barrier(comm);
+    start = MPI_Wtime();
+
     int num_rows;
     int num_cols;
+
     float *A = block_cyclic_distribution("A.bin", A, A_rows, A_cols, block_rows, block_cols, proc_rows, proc_cols, &num_rows, &num_cols, comm);
 
     #ifdef DEBUG
@@ -394,9 +420,8 @@ int main(int argc, char** argv) {
     #endif
 
     float *B = divide_rows("B.bin", B, B_rows, B_cols, block_rows, proc_cols, num_cols, comm);    
-
+   
     float *C_temp = multiplyMatrices(A, num_rows, num_cols, B, num_cols, B_cols, C_temp, my_rank);
-
 
     /* every process sends its C_temp matrix to the first process (say root process) in the same row, in the process grid */
     float *result = send_matrix_to_root(C_temp, num_rows, B_cols, my_rank, proc_rows, proc_cols, comm);
@@ -450,6 +475,17 @@ int main(int argc, char** argv) {
     free(B);
     free(C_temp);
 
+    printf("[Process %d] Done!\n", my_rank);
+
+
+    MPI_Barrier(comm);
+    end = MPI_Wtime();
+
+
     MPI_Finalize();
+
+    if (my_rank == 0) { /* use time on master node */
+        printf("Runtime = %f\n", end-start);
+    }
 }
  

@@ -2,18 +2,10 @@
 #include "matrix_gen/matrix_gen.h"
 #include "sequential/sequential_computation.h"
 #include "sequential/matrix_comparison/matrix_comparison.h"
+#include "utils/print_matrix/print_matrix.h"
 #include "utils/matrix_file_rw/matrix_rw.h"
+#include "utils/compute_max_error/compute_max_error.h"
 #include <stdlib.h>
-
-void print_matrix(int rows, int cols, float **matrix) {
-    for (int i = 0; i < rows; i++) {
-        puts("\n");
-        for (int j = 0; j < cols; j++) {
-            printf("%d ", (int)matrix[i][j]);
-        }
-    }
-    puts("\n");
-}
 
 int main(int argc, char *argv[]) {
 
@@ -34,16 +26,15 @@ int main(int argc, char *argv[]) {
     float **C;
     read_matrix_from_file("C.bin", &C, A_rows, B_cols);
     
-    compute_sequential(A, B, C, A_rows, A_cols, B_cols);
+    //compute_sequential(A, B, C, A_rows, A_cols, B_cols);
     
 
     float **res_matrix;
     read_matrix_from_file("parallel_result.bin", &res_matrix, A_rows, B_cols);
 
     float **comparison = compare_matrices(C, res_matrix, A_rows, B_cols);
-    printf("Comparison:\n");
-    print_matrix(A_rows, B_cols, comparison);
-
+    float max_error = compute_max_error(comparison, A_rows, B_cols);
+    printf("Max error: %f\n", max_error);
 
     return 0;
 }

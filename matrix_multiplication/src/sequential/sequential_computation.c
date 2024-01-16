@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "sequential_computation.h"
+#include "../utils/print_matrix/print_matrix.h"
 
 
 /* Compute C = C + A*B (sequentially) 
@@ -17,14 +18,7 @@ void compute_sequential(float **A, float **B, float **C, int m, int k, int n) {
         }
     }
 
-    //#ifdef DEBUG
-    printf("\nResult:\n");
-    for (int i = 0; i < m; i++) {
-        puts("\n");
-        for (int j = 0; j < n; j++) {
-            printf("%f ", C[i][j]);
-        }
-    }
-    puts("\n");
-    //#endif
+    #ifdef DEBUG
+    print_matrix(m, n, C);
+    #endif
 }
