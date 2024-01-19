@@ -1,0 +1,1 @@
+float **compare_matrices(float **matrix1, float **matrix2, int rows, int cols);
