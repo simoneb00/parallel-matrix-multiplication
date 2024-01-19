@@ -16,6 +16,11 @@
 /B.bin
 /C.bin
 /analysis.txt
-/matrix_multiplication
-/parallel_computation
 /gmon.out
+/C_openmp.bin
+/matrix_generation
+/matrix_mult
+/openmp_matrix_mult
+/parallel_computation
+/parallel_result.bin
+/sequential_result.bin
