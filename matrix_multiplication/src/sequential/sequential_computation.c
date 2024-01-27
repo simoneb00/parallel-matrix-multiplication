@@ -8,12 +8,12 @@
 *  B must be a k x n matrix
 *  C must be a m x n matrix       
 */
-void compute_sequential(float **A, float **B, float **C, int m, int k, int n) {
+float *compute_sequential(float *A, float *B, float *C, int m, int k, int n) {
     printf("Starting sequential computation\n");
     for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            for (int l = 0; l < k; l++) {
-                C[i][j] += A[i][l]*B[l][j]; 
+        for (int l = 0; l < k; l++) {
+            for (int j = 0; j < n; j++) {
+                C[i * n + j] += A[i * k + l] * B[l * n + j];
             }
         }
     }
@@ -21,4 +21,6 @@ void compute_sequential(float **A, float **B, float **C, int m, int k, int n) {
     #ifdef DEBUG
     print_matrix(m, n, C);
     #endif
+
+    return C;
 }
