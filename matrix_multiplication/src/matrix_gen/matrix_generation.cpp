@@ -7,51 +7,33 @@
 using namespace std;
 
 
-float **generate_random_matrix(int rows, int cols, int seed, int zero_matrix)
-{
+float* generate_random_matrix(int rows, int cols, int seed, int zero_matrix) {
     if (!zero_matrix) {
-        printf("Generating a matrix with %d rows and %d cols, starting from seed %d\n", rows, cols, seed);
-        float** matrix = new float*[rows];
-        for (int i = 0; i < rows; ++i) {
-            matrix[i] = new float[cols];
+        std::cout << "Generating a matrix with " << rows << " rows and " << cols << " cols, starting from seed " << seed << std::endl;
+        float* matrix = new float[rows * cols];
+
+        std::mt19937 gen(seed);                              // mersenne twister.
+        std::uniform_int_distribution<> dist(0, 10);         // distribute results between 0.0 and 10.0 inclusive.
+
+        for (int i = 0; i < rows * cols; ++i) {
+            matrix[i] = static_cast<float>(dist(gen));
         }
 
-        mt19937 gen(seed);                              // mersenne twister.
-        uniform_int_distribution<> dist(0, 10);     // distribute results between 0.0 and 10.0 inclusive.
-
-        for (int i = 0; i < rows; ++i) {
-            for (int j = 0; j < cols; ++j) {
-                matrix[i][j] = (float)dist(gen);
-            }
-        }
-
-        printf("Matrix successfully generated\n");
+        std::cout << "Matrix successfully generated" << std::endl;
 
         return matrix;
     } else {
-        printf("Generating a zero matrix with %d rows and %d cols\n", rows, cols);
-        float** matrix = new float*[rows];
-        for (int i = 0; i < rows; ++i) {
-            matrix[i] = new float[cols];
+        std::cout << "Generating a zero matrix with " << rows << " rows and " << cols << " cols" << std::endl;
+        float* matrix = new float[rows * cols];
+
+        for (int i = 0; i < rows * cols; ++i) {
+            matrix[i] = 0;
         }
 
-        for (int i = 0; i < rows; ++i) {
-            for (int j = 0; j < cols; ++j) {
-                matrix[i][j] = 0;
-            }
-        }
-
-        printf("Matrix successfully generated\n");
+        std::cout << "Matrix successfully generated" << std::endl;
 
         return matrix;
     }
-}
-
-void deallocate_matrix(float **matrix, int rows) {
-    for (int i = 0; i < rows; ++i) {
-            delete[] matrix[i];
-        }
-        delete[] matrix;
 }
 
 int main(int argc, char *argv[]) {
@@ -66,15 +48,17 @@ int main(int argc, char *argv[]) {
     int B_rows = A_cols;
     int B_cols = atoi(argv[3]); 
     
-    float **A = generate_random_matrix(A_rows, A_cols, 12345, 0);
-    writeMatrixToFile("A.bin", A, A_rows, A_cols);
-    deallocate_matrix(A, A_rows);
-    float **B = generate_random_matrix(B_rows, B_cols, 54321, 0);
-    writeMatrixToFile("B.bin", B, B_rows, B_cols);
-    deallocate_matrix(B, B_rows);
-    float **C = generate_random_matrix(A_rows, B_cols, 14235, 1);
-    writeMatrixToFile("C.bin", C, A_rows, B_cols);
-    deallocate_matrix(C, A_rows);
+    float *A = generate_random_matrix(A_rows, A_cols, 12345, 0);
+    write_matrix_to_file("A.bin", A, A_rows, A_cols);
+    delete[] A;
+
+    float *B = generate_random_matrix(B_rows, B_cols, 54321, 0);
+    write_matrix_to_file("B.bin", B, B_rows, B_cols);
+    delete[] B;
+
+    float *C = generate_random_matrix(A_rows, B_cols, 14235, 1);
+    write_matrix_to_file("C.bin", C, A_rows, B_cols);
+    delete[] C;
     
     return 0;
 }

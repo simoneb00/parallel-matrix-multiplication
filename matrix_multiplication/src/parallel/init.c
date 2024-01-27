@@ -393,6 +393,7 @@ int main(int argc, char** argv) {
     MPI_Comm_size(comm, &n_proc);
     MPI_Comm_rank(comm, &my_rank);
 
+    /* Retrieve all matrices' dimensions from a conf file */
     FILE *file  = fopen("src/parallel/config.txt", "r");
     if (file == NULL) {
         perror("Errore durante l'apertura del file");
@@ -407,20 +408,25 @@ int main(int argc, char** argv) {
     int result_rows = A_rows;
     int result_cols = B_cols;
 
+    /* sync barrier */
     MPI_Barrier(comm);
+
     start = MPI_Wtime();
 
     int num_rows;
     int num_cols;
-
+    
+    /* divide matrix A between processes, according to a block cyclic distribution */
     float *A = block_cyclic_distribution("A.bin", A, A_rows, A_cols, block_rows, block_cols, proc_rows, proc_cols, &num_rows, &num_cols, comm);
 
     #ifdef DEBUG
     printf("[Process %d] Got %d elements\n", my_rank, num_rows * num_cols);
     #endif
 
+    /* divide matrix B between processes, by rows */
     float *B = divide_rows("B.bin", B, B_rows, B_cols, block_rows, proc_cols, num_cols, comm);    
    
+    /* perform matrix multiplication */
     float *C_temp = multiplyMatrices(A, num_rows, num_cols, B, num_cols, B_cols, C_temp, my_rank);
 
     /* every process sends its C_temp matrix to the first process (say root process) in the same row, in the process grid */

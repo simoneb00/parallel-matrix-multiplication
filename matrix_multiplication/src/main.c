@@ -6,6 +6,7 @@
 #include "utils/matrix_file_rw/matrix_rw.h"
 #include "utils/compute_max_error/compute_max_error.h"
 #include <stdlib.h>
+#include <time.h>
 
 int main(int argc, char *argv[]) {
 
@@ -19,31 +20,33 @@ int main(int argc, char *argv[]) {
     int B_rows = A_cols;
     int B_cols = atoi(argv[3]); 
     
-    float **A;
-    read_matrix_from_file("A.bin", &A, A_rows, A_cols);
-    float **B;
-    read_matrix_from_file("B.bin", &B, B_rows, B_cols);
-    float **C;
-    read_matrix_from_file("C.bin", &C, A_rows, B_cols);
+    float *A = read_matrix_from_file("A.bin", A_rows, A_cols);
+    float *B = read_matrix_from_file("B.bin", B_rows, B_cols);
+    float *C = read_matrix_from_file("C.bin", A_rows, B_cols);
+
+    clock_t start_time = clock();
+
+    C = compute_sequential(A, B, C, A_rows, A_cols, B_cols);
+
+    clock_t end_time = clock();
+
+    write_matrix_to_file("sequential_result.bin", C, A_rows, B_cols);
+
+    double elapsed_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
+    printf("Tempo di esecuzione: %.4f secondi\n", elapsed_time);
     
-    // compute_sequential(A, B, C, A_rows, A_cols, B_cols);
-    // writeMatrixToFile("sequential_result.bin", C, A_rows, B_cols);
-    
-    float **sequential_result;
-    read_matrix_from_file("sequential_result.bin", &sequential_result, A_rows, B_cols);
 
-    float **res_matrix;
-    read_matrix_from_file("C_openmp.bin", &res_matrix, A_rows, B_cols);
+    float *sequential_result = read_matrix_from_file("sequential_result.bin", A_rows, B_cols);
 
+    float *res_matrix = read_matrix_from_file("C_openmp.bin", A_rows, B_cols);
 
-
-    float **comparison = compare_matrices(res_matrix, sequential_result, A_rows, B_cols);
+    float *comparison = compare_matrices(res_matrix, sequential_result, A_rows, B_cols);
 
     int error = 0;
 
     for (int i = 0; i < A_rows; i++) {
         for (int j = 0; j < B_cols; j++) {
-            if (comparison[i][j] != 0)
+            if (comparison[i * B_cols + j] != 0)
                 error = 1;
         }
     }
