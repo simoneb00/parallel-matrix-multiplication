@@ -51,7 +51,6 @@ void multiply(float *A, float *B, float *C, int A_rows, int A_cols, int B_cols) 
     transpose(B, Bt, A_cols, B_cols);
     dtime = omp_get_wtime() - dtime;
     printf("%f\n", dtime);
-
     dtime = omp_get_wtime();
 
     #pragma omp parallel
@@ -89,6 +88,8 @@ int main(int argc, char **argv) {
     int A_cols = 5000;
     int B_rows = 5000;
     int B_cols = 5000;
+
+    omp_set_num_threads(40);
 
     read_matrix_from_file("A.bin", &A, A_rows, A_cols);
     read_matrix_from_file("B.bin", &B, B_rows, B_cols);

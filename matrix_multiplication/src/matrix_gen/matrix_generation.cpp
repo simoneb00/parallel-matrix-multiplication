@@ -12,11 +12,11 @@ float* generate_random_matrix(int rows, int cols, int seed, int zero_matrix) {
         std::cout << "Generating a matrix with " << rows << " rows and " << cols << " cols, starting from seed " << seed << std::endl;
         float* matrix = new float[rows * cols];
 
-        std::mt19937 gen(seed);                              // mersenne twister.
-        std::uniform_int_distribution<> dist(0, 10);         // distribute results between 0.0 and 10.0 inclusive.
+        std::mt19937 gen(seed);                                          // mersenne twister.
+        std::uniform_real_distribution<float> dist(0.0f, 10.0f);         // distribute results between 0.0 and 10.0 inclusive.
 
         for (int i = 0; i < rows * cols; ++i) {
-            matrix[i] = static_cast<float>(dist(gen));
+            matrix[i] = dist(gen);
         }
 
         std::cout << "Matrix successfully generated" << std::endl;
@@ -48,15 +48,18 @@ int main(int argc, char *argv[]) {
     int B_rows = A_cols;
     int B_cols = atoi(argv[3]); 
     
-    float *A = generate_random_matrix(A_rows, A_cols, 12345, 0);
+    //float *A = generate_random_matrix(A_rows, A_cols, 12345, 0);
+    float *A = generate_random_matrix(A_rows, A_cols, 342234, 0);
     write_matrix_to_file("A.bin", A, A_rows, A_cols);
     delete[] A;
 
-    float *B = generate_random_matrix(B_rows, B_cols, 54321, 0);
+    //float *B = generate_random_matrix(B_rows, B_cols, 54321, 0);
+    float *B = generate_random_matrix(B_rows, B_cols, 19423, 0);
     write_matrix_to_file("B.bin", B, B_rows, B_cols);
     delete[] B;
 
-    float *C = generate_random_matrix(A_rows, B_cols, 14235, 1);
+    //float *C = generate_random_matrix(A_rows, B_cols, 14235, 0);
+    float *C = generate_random_matrix(A_rows, B_cols, 14235, 0);
     write_matrix_to_file("C.bin", C, A_rows, B_cols);
     delete[] C;
     

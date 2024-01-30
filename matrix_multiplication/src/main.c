@@ -24,6 +24,7 @@ int main(int argc, char *argv[]) {
     float *B = read_matrix_from_file("B.bin", B_rows, B_cols);
     float *C = read_matrix_from_file("C.bin", A_rows, B_cols);
 
+    
     clock_t start_time = clock();
 
     C = compute_sequential(A, B, C, A_rows, A_cols, B_cols);
@@ -38,9 +39,11 @@ int main(int argc, char *argv[]) {
 
     float *sequential_result = read_matrix_from_file("sequential_result.bin", A_rows, B_cols);
 
-    float *res_matrix = read_matrix_from_file("C_openmp.bin", A_rows, B_cols);
+    float *parallel_result = read_matrix_from_file("mpi_result.bin", A_rows, B_cols);
 
-    float *comparison = compare_matrices(res_matrix, sequential_result, A_rows, B_cols);
+    float *comparison = compare_matrices(parallel_result, sequential_result, A_rows, B_cols);
+
+    float *original_C = read_matrix_from_file("C.bin", A_rows, B_cols);
 
     int error = 0;
 
@@ -55,6 +58,17 @@ int main(int argc, char *argv[]) {
         printf("There's an error\n");
     else
         printf("There are no errors\n");
+
+
+    for (int i = 0; i < 100; i++) {
+        printf("%f ", parallel_result[i]);
+    }
+    puts("\n");
+
+    for (int i = 0; i < 100; i++) {
+        printf("%f ", sequential_result[i]);
+    }
+    puts("\n");
 
     float max_error = compute_max_error(comparison, A_rows, B_cols);
     printf("Max error: %f\n", max_error);

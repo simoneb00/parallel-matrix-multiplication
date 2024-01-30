@@ -18,8 +18,8 @@ all: sequential
 sequential: main matrix_comparison matrix_utils max_error
 	@echo
 	@echo "Compiling for sequential execution"
-	${CC} -c ${CFLAGS} ${SEQUENTIAL_COMP_DIR}/sequential_computation.c -o sequential_computation.o
-	${CC} -pg ${CFLAGS} main.o sequential_computation.o matrix_comparison.o matrix_rw.o print_matrix.o compute_max_error.o -o matrix_mult
+	${CC} -c -O3 ${CFLAGS} ${SEQUENTIAL_COMP_DIR}/sequential_computation.c -o sequential_computation.o
+	${CC} ${CFLAGS} main.o sequential_computation.o matrix_comparison.o matrix_rw.o print_matrix.o compute_max_error.o -o matrix_mult
 	rm *.o
 	@echo "Compilation successful"
 	@echo
@@ -27,14 +27,12 @@ sequential: main matrix_comparison matrix_utils max_error
 mpi:
 	@echo
 	@echo "Compiling for MPI execution"
-	mpicc -lm ${CFLAGS} ${PARALLEL_COMP_DIR}/init.c -o parallel_computation
+	mpicc ${CFLAGS} -O3 ${PARALLEL_COMP_DIR}/init.c -o parallel_computation -lm
 
-openmp: matrix_utils
+openmp:
 	@echo
 	@echo "Compiling for OpenMP execution"
-	${CC} ${CFLAGS} -c -fopenmp ${OPENMP_DIR}/matrix_mult.c -o openmp_matrix_mult.o
-	${CC} ${CFLAGS} -fopenmp openmp_matrix_mult.o matrix_rw.o -o openmp_matrix_mult
-	rm *.o
+	${CC} ${CFLAGS} -O3 -fopenmp ${OPENMP_DIR}/matrix_mult.c -o openmp_matrix_mult	
 	@echo 
 	@echo "Compilation successful"
 
