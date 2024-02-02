@@ -12,8 +12,8 @@ float* generate_random_matrix(int rows, int cols, int seed, int zero_matrix) {
         std::cout << "Generating a matrix with " << rows << " rows and " << cols << " cols, starting from seed " << seed << std::endl;
         float* matrix = new float[rows * cols];
 
-        std::mt19937 gen(seed);                                          // mersenne twister.
-        std::uniform_real_distribution<float> dist(0.0f, 10.0f);         // distribute results between 0.0 and 10.0 inclusive.
+        std::mt19937 gen(seed);                                         // mersenne twister.
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);         // distribute results between 0.0 and 1.0 inclusive.
 
         for (int i = 0; i < rows * cols; ++i) {
             matrix[i] = dist(gen);
