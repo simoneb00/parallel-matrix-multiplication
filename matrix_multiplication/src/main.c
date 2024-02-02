@@ -34,44 +34,7 @@ int main(int argc, char *argv[]) {
     write_matrix_to_file("sequential_result.bin", C, A_rows, B_cols);
 
     double elapsed_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
-    printf("Tempo di esecuzione: %.4f secondi\n", elapsed_time);
+    printf("Sequential execution time: %.4f s\n", elapsed_time);
     
-
-    float *sequential_result = read_matrix_from_file("sequential_result.bin", A_rows, B_cols);
-
-    float *parallel_result = read_matrix_from_file("mpi_result.bin", A_rows, B_cols);
-
-    float *comparison = compare_matrices(parallel_result, sequential_result, A_rows, B_cols);
-
-    float *original_C = read_matrix_from_file("C.bin", A_rows, B_cols);
-
-    int error = 0;
-
-    for (int i = 0; i < A_rows; i++) {
-        for (int j = 0; j < B_cols; j++) {
-            if (comparison[i * B_cols + j] != 0)
-                error = 1;
-        }
-    }
-
-    if (error) 
-        printf("There's an error\n");
-    else
-        printf("There are no errors\n");
-
-
-    for (int i = 0; i < 100; i++) {
-        printf("%f ", parallel_result[i]);
-    }
-    puts("\n");
-
-    for (int i = 0; i < 100; i++) {
-        printf("%f ", sequential_result[i]);
-    }
-    puts("\n");
-
-    float max_error = compute_max_error(comparison, A_rows, B_cols);
-    printf("Max error: %f\n", max_error);
-
     return 0;
 }

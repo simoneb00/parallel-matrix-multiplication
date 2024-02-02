@@ -15,11 +15,11 @@ OPENMP_DIR = ${SRC_DIR}/parallel/OpenMP
 
 all: sequential
 
-sequential: main matrix_comparison matrix_utils max_error
+sequential: main matrix_utils
 	@echo
 	@echo "Compiling for sequential execution"
 	${CC} -c -O3 ${CFLAGS} ${SEQUENTIAL_COMP_DIR}/sequential_computation.c -o sequential_computation.o
-	${CC} ${CFLAGS} main.o sequential_computation.o matrix_comparison.o matrix_rw.o print_matrix.o compute_max_error.o -o matrix_mult
+	${CC} ${CFLAGS} main.o sequential_computation.o matrix_rw.o print_matrix.o -o matrix_mult
 	rm *.o
 	@echo "Compilation successful"
 	@echo
@@ -49,8 +49,11 @@ matrix_generation: matrix_utils
 main:
 	${CC} ${CFLAGS} -c ${SRC_DIR}/main.c -o main.o 
 
-matrix_comparison:
+matrix_comparison: matrix_utils max_error
+	@echo
+	@echo "Compiling for results comparison"
 	${CC} ${CFLAGS} -c ${MATRIX_COMPARISON_DIR}/matrix_comparison.c -o matrix_comparison.o
+	${CC} ${CFLAGS} matrix_comparison.o matrix_rw.o compute_max_error.o -o comparison
 
 matrix_utils:
 	${CC} ${CFLAGS} -c ${UTILS_DIR}/matrix_file_rw/matrix_rw.c -o matrix_rw.o

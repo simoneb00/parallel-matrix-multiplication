@@ -61,10 +61,11 @@ void multiply(float *A, float *B, float *C, int A_rows, int A_cols, int B_cols) 
             for (j = 0; j < B_cols; j++) {
                 double dot  = 0;
                 for (k = 0; k < A_cols; k++) {
-                    dot += A[i * A_rows + k] * Bt[j * B_cols + k];
+                    dot += A[i * A_cols + k] * Bt[j * A_cols + k];
                 } 
-                C[i * A_cols + j] += dot;
+                C[i * B_cols + j] += dot;            
             }
+
         }
 
     }
@@ -73,7 +74,7 @@ void multiply(float *A, float *B, float *C, int A_rows, int A_cols, int B_cols) 
     printf("Multiplication time: %f\n", dtime);
 
 
-    write_matrix_to_file("C_openmp.bin", C, A_rows, B_cols);
+    write_matrix_to_file("openmp_result.bin", C, A_rows, B_cols);
 
     free(Bt);
 }
@@ -84,12 +85,10 @@ int main(int argc, char **argv) {
     float *B;
     float *C;
 
-    int A_rows = 5000;
+    int A_rows = 2500;
     int A_cols = 5000;
     int B_rows = 5000;
-    int B_cols = 5000;
-
-    omp_set_num_threads(40);
+    int B_cols = 3000;
 
     read_matrix_from_file("A.bin", &A, A_rows, A_cols);
     read_matrix_from_file("B.bin", &B, B_rows, B_cols);
