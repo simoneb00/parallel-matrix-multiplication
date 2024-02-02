@@ -255,7 +255,6 @@ float *multiplyMatrices(float *A, int A_rows, int A_cols, float *B, int B_rows, 
     }
 
     start = MPI_Wtime();
-    printf("[Process %d] Multiplying a matrix %dx%d\n", rank, A_rows, B_cols);
 
     for (int i = 0; i < A_rows; ++i) {
         for (int k = 0; k < A_cols; ++k) {
@@ -268,7 +267,11 @@ float *multiplyMatrices(float *A, int A_rows, int A_cols, float *B, int B_rows, 
     end = MPI_Wtime();
 
     printf("[Process %d] Tempo di ciclo nella moltiplicazione = %f\n", rank, end-start);
-
+printf("[Process %d] Multiplication Result:\n", rank);
+    for (int i = 0; i < A_rows * A_cols; i++) {
+        printf("%f ", C_temp[i]);
+    }
+    puts("");
     return C_temp;
 }
 
@@ -524,27 +527,41 @@ int main(int argc, char** argv) {
     }
     */
 
-    float *C = divide_rows("C.bin", C, A_rows, B_cols, block_rows, proc_cols, num_cols, comm);
 
-    if (my_rank == 0) {
+    int C_rows, C_cols;
+
+    compute_submatrix_dimension(A_rows, B_cols, block_rows, B_cols, proc_rows, 1, my_rank, &C_rows, &C_cols);
+
+    float *C = divide_rows("C.bin", C, A_rows, B_cols, block_rows, proc_cols, C_cols, comm);
+
+    /*
+    if (my_rank % proc_cols == 0) {
+        printf("\n\n[Process %d]\n", my_rank);
         for (int i = 0; i < 10; i++) {
             printf("%f ", partial_result[i]);
         }
         puts("\n");
-    }
+    }*/
 
-    for (int i = 0; i < num_rows * B_cols; i++) {
-        partial_result[i] += C[i];
-    }
+    if (my_rank % proc_cols == 0) {
 
-    if (my_rank == 0) {
-        for (int i = 0; i < 10; i++) {
-            printf("%f ", partial_result[i]);
+        printf("\n\n[Process %d] num_rows = %d, B_cols = %d\n", my_rank, num_rows, B_cols);
+        /* C + A x B */
+        for (int i = 0; i < num_rows * B_cols; i++) {
+            partial_result[i] += C[i];
         }
-        puts("\n");
     }
 
     MPI_Barrier(comm);
+
+    /*
+    if (my_rank % proc_cols == 0) {
+        printf("\n\n[Process %d]\n", my_rank);
+        for (int i = 0; i < 10; i++) {
+            printf("%f ", partial_result[i]);
+        }
+        puts("\n");
+    }*/
 
     MPI_Comm root_comm;
     MPI_Comm_split(comm, my_rank % proc_cols, my_rank, &root_comm);
@@ -555,13 +572,6 @@ int main(int argc, char** argv) {
      /* Write result on file */
     if (my_rank % proc_cols == 0) {
         write_result_to_file("mpi_result.bin", partial_result, num_rows * B_cols, my_rank, result_rows, result_cols, block_rows, proc_rows, proc_cols, root_comm);
-    }
-
-    if (my_rank == 0) {
-        for (int i = 0; i < 10; i++) {
-            printf("%f ", partial_result[i]);
-        }
-        puts("\n");
     }
 
     free(A);

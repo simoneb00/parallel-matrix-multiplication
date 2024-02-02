@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
     int A_rows = 2500;
     int A_cols = 5000;
     int B_rows = 5000;
-    int B_cols = 3000;
+    int B_cols = 2500;
 
     read_matrix_from_file("A.bin", &A, A_rows, A_cols);
     read_matrix_from_file("B.bin", &B, B_rows, B_cols);
