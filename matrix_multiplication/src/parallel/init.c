@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <errno.h>
+#include <unistd.h>
 
 /// @brief This function computes how many values should be assigned to every process: 
 ///        it determines the max number of blocks that can be assigned to a process, by computing how many blocks
@@ -362,6 +363,54 @@ void write_result_to_file(char *filename, float *result, int result_len, int ran
 }
 
 
+void save_result_to_file(float elapsed_time, int my_rank, int n_proc, char *argv[]) {
+    /* Write average time to CSV file */
+    float *all_elapsed_times = NULL;
+    if (my_rank == 0) {
+        all_elapsed_times = (float *)malloc(n_proc * sizeof(float));
+    }
+    MPI_Gather(&elapsed_time, 1, MPI_FLOAT, all_elapsed_times, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+    if (my_rank == 0) {
+        
+        float max_time = 0.0;
+        for (int i = 0; i < n_proc; i++) {
+            if (all_elapsed_times[i] > max_time) 
+                max_time = all_elapsed_times[i];
+        }
+
+        if (access("mpi_execution_data.csv", F_OK) == 0) {
+            // file exists
+            FILE *file = fopen("mpi_execution_data.csv", "a");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                MPI_Abort(MPI_COMM_WORLD, 1);
+            }
+
+            fprintf(file, "%s,%s,%s,%s,%s,%s,%s,%f\n", argv[1], argv[2], argv[3], argv[4], argv[5], argv[6], argv[7], max_time);
+
+            fclose(file);
+
+        } else {
+            // file doesn't exist
+            FILE *file = fopen("mpi_execution_data.csv", "w");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                MPI_Abort(MPI_COMM_WORLD, 1);
+            }
+
+            fprintf(file, "m,k,n,proc_rows,proc_cols,block_rows,block_cols,max_execution_time\n");
+            fprintf(file, "%s,%s,%s,%s,%s,%s,%s,%f\n", argv[1], argv[2], argv[3], argv[4], argv[5], argv[6], argv[7], max_time);
+
+            fclose(file);
+        }
+
+
+        free(all_elapsed_times);
+    }
+}
+
+
 int main(int argc, char** argv) {
 
     if (argc != 8) {
@@ -517,7 +566,8 @@ int main(int argc, char** argv) {
     MPI_Barrier(comm);
     end = MPI_Wtime();
 
-    printf("[Process %d] Runtime = %f\n", my_rank, end-start);
+    float elapsed_time = end-start;
+    save_result_to_file(elapsed_time, my_rank, n_proc, argv);
 
     MPI_Finalize();
     

@@ -1,24 +1,17 @@
 #include <stdio.h>
-#include "matrix_gen/matrix_gen.h"
-#include "sequential/sequential_computation.h"
-#include "sequential/matrix_comparison/matrix_comparison.h"
-#include "utils/print_matrix/print_matrix.h"
-#include "utils/matrix_file_rw/matrix_rw.h"
-#include "utils/compute_max_error/compute_max_error.h"
+#include "../matrix_gen/matrix_gen.h"
+#include "sequential_computation/sequential_computation.h"
+#include "matrix_comparison/matrix_comparison.h"
+#include "../utils/print_matrix/print_matrix.h"
+#include "../utils/matrix_file_rw/matrix_rw.h"
+#include "../utils/compute_max_error/compute_max_error.h"
 #include <stdlib.h>
 #include <time.h>
+#include "matrix_mult.h"
 
-int main(int argc, char *argv[]) {
-
-    if (argc != 4) {
-        fprintf(stderr, "Usage: ./matrix_multiplication m k n\n");
-        return 1;
-    }
-
-    int A_rows = atoi(argv[1]);
-    int A_cols = atoi(argv[2]);
+void sequential_computation(int A_rows, int A_cols, int B_cols) {
+    
     int B_rows = A_cols;
-    int B_cols = atoi(argv[3]); 
     
     float *A = read_matrix_from_file("A.bin", A_rows, A_cols);
     float *B = read_matrix_from_file("B.bin", B_rows, B_cols);
@@ -35,6 +28,4 @@ int main(int argc, char *argv[]) {
 
     double elapsed_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
     printf("Sequential execution time: %.4f s\n", elapsed_time);
-    
-    return 0;
 }

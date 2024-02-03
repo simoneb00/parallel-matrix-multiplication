@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <omp.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 void write_matrix_to_file(const char *filename, float *matrix, int rows, int cols) {
     FILE* file = fopen(filename, "wb"); 
@@ -80,15 +81,51 @@ void multiply(float *A, float *B, float *C, int A_rows, int A_cols, int B_cols) 
 }
 
 
+void save_result_to_file(double time, int m, int k, int n, int num_threads) {
+    if (access("openmp_execution_data.csv", F_OK) == 0) {
+            // file exists
+            FILE *file = fopen("openmp_execution_data.csv", "a");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                exit(1);
+            }
+
+            fprintf(file, "%d,%d,%d,%d,%f\n", m, k, n, num_threads, time);
+            fclose(file);
+
+        } else {
+            // file doesn't exist
+            FILE *file = fopen("openmp_execution_data.csv", "w");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                exit(1);
+            }
+
+            fprintf(file, "m,k,n,num_threads,execution_time\n");
+            fprintf(file, "%d,%d,%d,%d,%f\n", m, k, n, num_threads, time);
+            fclose(file);
+        }
+}
+
+
 int main(int argc, char **argv) {
+
+    if (argc != 5) {
+        printf("Usage: ./openmp_computation A_rows A_cols B_rows num_threads\n");
+        return 1;
+    }
+
     float *A;
     float *B;
     float *C;
 
-    int A_rows = 2500;
-    int A_cols = 5000;
-    int B_rows = 5000;
-    int B_cols = 2500;
+    int A_rows = atoi(argv[1]);
+    int A_cols = atoi(argv[2]);
+    int B_rows = A_cols;
+    int B_cols = atoi(argv[3]);
+
+    int num_threads = atoi(argv[4]);
+    omp_set_num_threads(num_threads);
 
     read_matrix_from_file("A.bin", &A, A_rows, A_cols);
     read_matrix_from_file("B.bin", &B, B_rows, B_cols);
@@ -97,6 +134,6 @@ int main(int argc, char **argv) {
     double dtime = omp_get_wtime();
     multiply(A, B, C, A_rows, A_cols, B_cols);
     dtime = omp_get_wtime() - dtime;
-    printf("Execution time: %f\n", dtime);
 
+    save_result_to_file(dtime, A_rows, A_cols, B_cols, num_threads);
 }
