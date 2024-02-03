@@ -49,11 +49,7 @@ for line in "${lines[@]}"; do
         param3=${params[2]}
         param7=${params[7]}
 
-        echo ""
-        echo "Generating matrices"
-
         ./matrix_generation $param1 $param2 $param3
-
 
         n_processes=$(( ${params[3]} * ${params[4]} ))
 
