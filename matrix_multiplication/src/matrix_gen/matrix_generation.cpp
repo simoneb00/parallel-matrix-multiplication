@@ -48,17 +48,14 @@ int main(int argc, char *argv[]) {
     int B_rows = A_cols;
     int B_cols = atoi(argv[3]); 
     
-    //float *A = generate_random_matrix(A_rows, A_cols, 12345, 0);
     float *A = generate_random_matrix(A_rows, A_cols, 342234, 0);
     write_matrix_to_file("A.bin", A, A_rows, A_cols);
     delete[] A;
 
-    //float *B = generate_random_matrix(B_rows, B_cols, 54321, 0);
     float *B = generate_random_matrix(B_rows, B_cols, 19423, 0);
     write_matrix_to_file("B.bin", B, B_rows, B_cols);
     delete[] B;
 
-    //float *C = generate_random_matrix(A_rows, B_cols, 14235, 0);
     float *C = generate_random_matrix(A_rows, B_cols, 14235, 0);
     write_matrix_to_file("C.bin", C, A_rows, B_cols);
     delete[] C;

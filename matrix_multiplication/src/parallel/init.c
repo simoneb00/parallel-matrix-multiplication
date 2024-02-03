@@ -379,6 +379,7 @@ void save_result_to_file(float elapsed_time, int my_rank, int n_proc, char *argv
                 max_time = all_elapsed_times[i];
         }
 
+
         if (access("mpi_execution_data.csv", F_OK) == 0) {
             // file exists
             FILE *file = fopen("mpi_execution_data.csv", "a");
@@ -408,6 +409,7 @@ void save_result_to_file(float elapsed_time, int my_rank, int n_proc, char *argv
 
         free(all_elapsed_times);
     }
+
 }
 
 

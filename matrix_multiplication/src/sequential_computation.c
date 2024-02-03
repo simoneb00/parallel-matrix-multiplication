@@ -38,6 +38,8 @@ void save_result_to_file(double time, int m, int k, int n) {
 
 int main(int argc, char *argv[]) {
 
+    clock_t start_time = clock();
+
     if (argc != 4) {
         fprintf(stderr, "Usage: ./matrix_multiplication m k n\n");
         return 1;
@@ -52,8 +54,6 @@ int main(int argc, char *argv[]) {
     float *B = read_matrix_from_file("B.bin", B_rows, B_cols);
     float *C = read_matrix_from_file("C.bin", A_rows, B_cols);
 
-    
-    clock_t start_time = clock();
 
     C = compute_sequential(A, B, C, A_rows, A_cols, B_cols);
 

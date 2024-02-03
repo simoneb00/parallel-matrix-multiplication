@@ -1,8 +1,66 @@
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
+#include <math.h>
+#include <unistd.h>
 #include "matrix_comparison.h"
 #include "../../utils/matrix_file_rw/matrix_rw.h"
 #include "../../utils/compute_max_error/compute_max_error.h"
+
+
+void save_result_to_file_mpi(int m, int k, int n, int proc_rows, int proc_cols, int block_rows, int block_cols, float GFlops, float max_rel_diff, float speedup) {
+    if (access("mpi_performance.csv", F_OK) == 0) {
+            // file exists
+            FILE *file = fopen("mpi_performance.csv", "a");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                exit(1);
+            }
+
+            fprintf(file, "%d,%d,%d,%d,%d,%d,%d,%f,%e,%f\n", m, k, n, proc_rows, proc_cols, block_rows, block_cols, GFlops, max_rel_diff, speedup);
+            fclose(file);
+
+        } else {
+            // file doesn't exist
+            FILE *file = fopen("mpi_performance.csv", "w");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                exit(1);
+            }
+
+            fprintf(file, "m,k,n,proc_rows,proc_cols,block_rows,block_cols,GFlops,max_rel_diff,speedup\n");
+            fprintf(file, "%d,%d,%d,%d,%d,%d,%d,%f,%e,%f\n", m, k, n, proc_rows, proc_cols, block_rows, block_cols, GFlops, max_rel_diff, speedup);
+            fclose(file);
+        }
+}
+
+
+void save_result_to_file_openmp(int m, int k, int n, int num_threads, float GFlops, float max_rel_diff, float speedup) {
+    if (access("openmp_performance.csv", F_OK) == 0) {
+            // file exists
+            FILE *file = fopen("openmp_performance.csv", "a");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                exit(1);
+            }
+
+            fprintf(file, "%d,%d,%d,%d,%f,%e,%f\n", m, k, n, num_threads, GFlops, max_rel_diff, speedup);
+            fclose(file);
+
+        } else {
+            // file doesn't exist
+            FILE *file = fopen("openmp_performance.csv", "w");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                exit(1);
+            }
+
+            fprintf(file, "m,k,n,num_threads,GFlops,max_rel_diff,speedup\n");
+            fprintf(file, "%d,%d,%d,%d,%f,%e,%f\n", m, k, n, num_threads, GFlops, max_rel_diff, speedup);
+            fclose(file);
+        }
+}
+
 
 float *compare_matrices(float *matrix1, float *matrix2, int rows, int cols) {
 
@@ -69,14 +127,20 @@ float compute_max_rel_diff(float *seq_result, float *par_result, float *comparis
 }
 
 float compute_GFlops(int m, int k, int n, int time) {
-    return 2*m*n*k/time;
+    return (2*m*n*k/time) * pow(10.0, -9);
+}
+
+float compute_speedup(float parallel_time, float sequential_time) {
+    return sequential_time / parallel_time;
 }
 
 
 int main(int argc, char *argv[]) {
 
-    if (argc != 9) {
-        printf("Usage: ./comparison m k n proc_rows proc_cols block_rows block_cols num_threads\n");
+    printf("%d\n", argc);
+
+    if (argc != 12) {
+        printf("Usage: ./comparison m k n proc_rows proc_cols block_rows block_cols num_threads sequential_time parallel_time mpi/openmp\n");
         return 1;
     }
 
@@ -90,35 +154,48 @@ int main(int argc, char *argv[]) {
     int block_cols = atoi(argv[7]);
     int num_threads = atoi(argv[8]);
 
+    float sequential_time = atof(argv[9]);
+    float parallel_time = atof(argv[10]);
+
+    char *type = argv[11];
+
+
     float *sequential_result = read_matrix_from_file("sequential_result.bin", rows, cols);
-    float *mpi_result = read_matrix_from_file("mpi_result.bin", rows, cols);
-    float *openmp_result = read_matrix_from_file("openmp_result.bin", rows, cols);
 
-    int x, y;
 
-    puts("");
-    printf("Comparing sequential result to mpi result\n");
-    float *mpi_comparison = compare_matrices(sequential_result, mpi_result, rows, cols);
-    count_errors(mpi_comparison, rows, cols, &x, &y);
+    if (strcmp(type, "mpi")) {
+        puts("");
+        printf("Comparing sequential result to mpi result\n");
 
-    float max_diff_mpi = compute_max_diff(sequential_result, mpi_result, mpi_comparison, rows, cols);
+        float *mpi_result = read_matrix_from_file("mpi_result.bin", rows, cols);
+        float *mpi_comparison = compare_matrices(sequential_result, mpi_result, rows, cols);
+
+        float max_rel_diff_mpi = compute_max_rel_diff(sequential_result, mpi_result, mpi_comparison, rows, cols);
+        float GFlops = compute_GFlops(rows, k, cols, parallel_time);
+        float speedup = compute_speedup(parallel_time, sequential_time);
+
+        save_result_to_file_mpi(rows, k, cols, proc_rows, proc_cols, block_rows, block_cols, GFlops, max_rel_diff_mpi, speedup);
+
+        free(mpi_result);
+        free(mpi_comparison);
+
+        return 0;
+    }
 
     puts("");
     printf("Comparing sequential result to openmp result\n");
+
+    float *openmp_result = read_matrix_from_file("openmp_result.bin", rows, cols);
     float *openmp_comparison = compare_matrices(sequential_result, openmp_result, rows, cols);
-    count_errors(openmp_comparison, rows, cols, &x, &y);
 
-    float max_diff_openmp = compute_max_diff(sequential_result, openmp_result, openmp_comparison, rows, cols);
+    float max_rel_diff_openmp = compute_max_rel_diff(sequential_result, openmp_result, openmp_comparison, rows, cols);
+    float GFlops = compute_GFlops(rows, k, cols, parallel_time);
+    float speedup = compute_speedup(parallel_time, sequential_time);
 
-    
-    printf("MPI max rel diff: %e\n", max_diff_mpi);
-    printf("OpenMP max rel diff: %e\n", max_diff_openmp);
-
+    save_result_to_file_openmp(rows, k, cols, num_threads, GFlops, max_rel_diff_openmp, speedup);
 
     free(sequential_result);
-    free(mpi_result);
     free(openmp_result);
-    free(mpi_comparison);
     free(openmp_comparison);
 
 }
