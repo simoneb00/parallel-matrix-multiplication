@@ -1,1 +1,0 @@
-void sequential_computation(int A_rows, int A_cols, int B_cols);

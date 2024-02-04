@@ -1,1 +1,0 @@
-void openmp_computation(int A_rows, int A_cols, int B_cols);

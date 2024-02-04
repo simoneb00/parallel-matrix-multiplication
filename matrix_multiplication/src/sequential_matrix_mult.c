@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "matrix_gen/matrix_gen.h"
-#include "sequential/sequential_computation.h"
+#include "sequential/sequential_computation/sequential_computation.h"
 #include "sequential/matrix_comparison/matrix_comparison.h"
 #include "utils/print_matrix/print_matrix.h"
 #include "utils/matrix_file_rw/matrix_rw.h"

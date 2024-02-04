@@ -62,6 +62,33 @@ void save_result_to_file_openmp(int m, int k, int n, int num_threads, float GFlo
 }
 
 
+void save_result_to_file_sequential(int m, int k, int n, float GFlops) {
+    if (access("sequential_performance.csv", F_OK) == 0) {
+            // file exists
+            FILE *file = fopen("sequential_performance.csv", "a");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                exit(1);
+            }
+
+            fprintf(file, "%d,%d,%d,%f\n", m, k, n, GFlops);
+            fclose(file);
+
+        } else {
+            // file doesn't exist
+            FILE *file = fopen("sequential_performance.csv", "w");
+            if (file == NULL) {
+                perror("Error in opening CSV file");
+                exit(1);
+            }
+
+            fprintf(file, "m,k,n,GFlops\n");
+            fprintf(file, "%d,%d,%d,%f\n", m, k, n, GFlops);
+            fclose(file);
+        }
+}
+
+
 float *compare_matrices(float *matrix1, float *matrix2, int rows, int cols) {
 
     float *result = (float *)malloc(rows * cols * sizeof(float));
@@ -79,55 +106,33 @@ float *compare_matrices(float *matrix1, float *matrix2, int rows, int cols) {
     return result;
 }
 
-void count_errors(float *comparison, int rows, int cols, int *x, int *y) {
-    int count = 0;
+
+float max(float x, float y) {
+    return x > y ? x : y;
+}
+
+
+float compute_max_rel_diff(float *seq_result, float *par_result, float *comparison, int rows, int cols) {
+    float max_rel_diff = 0.0;
+    float curr_value;
 
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
-            if (comparison[i * cols + j] != 0) {
-                count++;
-                //printf("There's an error at coordinates (%d, %d)\n", i, j);
+            curr_value = comparison[i * cols + j] / max(seq_result[i * cols + j], par_result[i * cols + j]);
+            if (curr_value > max_rel_diff) {
+                max_rel_diff = curr_value;
             }
         }
     }
-    puts("");
-
-    printf("There are %d errors\n", count);
-
-    float max_error = compute_max_error(comparison, rows, cols, x, y);
-    printf("Max error: %f\n", max_error);
+    return max_rel_diff;
+    
 }
 
-
-float find_max_value(const float *matrix, int rows, int cols) {
-    float max_value = matrix[0];  // Supponiamo che il primo elemento sia il massimo
-
-    for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
-            float current_value = matrix[i * cols + j];
-            if (current_value > max_value) {
-                max_value = current_value;
-            }
-        }
-    }
-
-    return max_value;
-}
-
-
-/* Max diff is defined as the max value in the matrix comparison divided by the max value in both matrices seq_result and par_result  */
-float compute_max_rel_diff(float *seq_result, float *par_result, float *comparison, int rows, int cols) {
-    float max_value_comparison = find_max_value(comparison, rows, cols);
-    float max_value_seq = find_max_value(seq_result, rows, cols);
-    float max_value_par = find_max_value(par_result, rows, cols);
-
-    float max_value = max_value_seq > max_value_par ? max_value_seq : max_value_par;
-
-    return max_value_comparison / max_value;
-}
-
-float compute_GFlops(int m, int k, int n, int time) {
-    return (2*m*n*k/time) * pow(10.0, -9);
+float compute_GFlops(int m, int k, int n, float time) {
+    float num = 2.0*m*k*n;
+    float flops = num / time;
+    float GFlops = flops * pow(10, -9);
+    return GFlops;
 }
 
 float compute_speedup(float parallel_time, float sequential_time) {
@@ -140,7 +145,7 @@ int main(int argc, char *argv[]) {
     printf("%d\n", argc);
 
     if (argc != 12) {
-        printf("Usage: ./comparison m k n proc_rows proc_cols block_rows block_cols num_threads sequential_time parallel_time mpi/openmp\n");
+        printf("Usage: ./comparison m k n proc_rows proc_cols block_rows block_cols num_threads sequential_time parallel_time mpi/openmp/sequential\n");
         return 1;
     }
 
@@ -163,9 +168,11 @@ int main(int argc, char *argv[]) {
     float *sequential_result = read_matrix_from_file("sequential_result.bin", rows, cols);
 
 
-    if (strcmp(type, "mpi")) {
+    if (!strcmp(type, "mpi")) {
         puts("");
         printf("Comparing sequential result to mpi result\n");
+
+        printf("MPI time received: %f\n", parallel_time);
 
         float *mpi_result = read_matrix_from_file("mpi_result.bin", rows, cols);
         float *mpi_comparison = compare_matrices(sequential_result, mpi_result, rows, cols);
@@ -180,10 +187,20 @@ int main(int argc, char *argv[]) {
         free(mpi_comparison);
 
         return 0;
+
+    } else if (!strcmp(type, "sequential")) {
+        float GFlops = compute_GFlops(rows, k, cols, sequential_time);
+        save_result_to_file_sequential(rows, k, cols, GFlops);
+
+        free(sequential_result);
+
+        return 0;
     }
 
     puts("");
     printf("Comparing sequential result to openmp result\n");
+
+    printf("OpenMP time received: %f\n", parallel_time);
 
     float *openmp_result = read_matrix_from_file("openmp_result.bin", rows, cols);
     float *openmp_comparison = compare_matrices(sequential_result, openmp_result, rows, cols);
@@ -197,5 +214,7 @@ int main(int argc, char *argv[]) {
     free(sequential_result);
     free(openmp_result);
     free(openmp_comparison);
+
+    return 0;
 
 }

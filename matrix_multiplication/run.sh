@@ -63,9 +63,10 @@ for line in "${lines[@]}"; do
             processed_configs_sequential["$current_config_sequential"]=1
             last_line=$(tail -n 1 "sequential_execution_data.csv")
             sequential_execution_time=$(echo "$last_line" | awk -F ',' '{print $4}')
-        fi
+            echo "Comparing sequential, time is ${sequential_execution_time}"
+            ./comparison ${params[0]} ${params[1]} ${params[2]} ${params[3]} ${params[4]} ${params[5]} ${params[6]} ${params[7]} ${sequential_execution_time} 0.0 sequential
 
-        echo "sequential_execution_time: ${sequential_execution_time}"
+        fi
 
         echo "Starting MPI computation with ${n_processes} processes, with process grid ${params[3]}x${params[4]} and block ${params[5]}x${params[6]}"
         mpirun -np ${n_processes} ./mpi_computation "${params[@]:0:7}"
@@ -74,7 +75,7 @@ for line in "${lines[@]}"; do
         last_line=$(tail -n 1 "mpi_execution_data.csv")
         mpi_execution_time=$(echo "$last_line" | awk -F ',' '{print $8}')
 
-        echo "mpi_execution_time: ${mpi_execution_time}"
+        echo "Comparing MPI, time is ${mpi_execution_time}"
         ./comparison ${params[0]} ${params[1]} ${params[2]} ${params[3]} ${params[4]} ${params[5]} ${params[6]} ${params[7]} ${sequential_execution_time} ${mpi_execution_time} mpi
 
         if is_configuration_processed_openmp "$current_config_openmp"; then
@@ -84,6 +85,9 @@ for line in "${lines[@]}"; do
             processed_configs_openmp["$current_config_openmp"]=1
             last_line=$(tail -n 1 "openmp_execution_data.csv")
             openmp_execution_time=$(echo "$last_line" | awk -F ',' '{print $5}')
+
+            echo "Comparing OpenMP, time is ${openmp_execution_time}"
+
             ./comparison ${params[0]} ${params[1]} ${params[2]} ${params[3]} ${params[4]} ${params[5]} ${params[6]} ${params[7]} ${sequential_execution_time} ${openmp_execution_time} openmp
         fi
 

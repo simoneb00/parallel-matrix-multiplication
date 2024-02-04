@@ -47,12 +47,8 @@ void transpose(float *A, float *B, int rows, int cols) {
 
 
 void multiply(float *A, float *B, float *C, int A_rows, int A_cols, int B_cols) {   
-    double dtime = omp_get_wtime();
     float *Bt = (float*)malloc(sizeof(float)* A_cols * B_cols);
     transpose(B, Bt, A_cols, B_cols);
-    dtime = omp_get_wtime() - dtime;
-    printf("%f\n", dtime);
-    dtime = omp_get_wtime();
 
     #pragma omp parallel
     {
@@ -70,10 +66,6 @@ void multiply(float *A, float *B, float *C, int A_rows, int A_cols, int B_cols) 
         }
 
     }
-
-    dtime = omp_get_wtime() - dtime;
-    printf("Multiplication time: %f\n", dtime);
-
 
     write_matrix_to_file("openmp_result.bin", C, A_rows, B_cols);
 
@@ -115,6 +107,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    double dtime = omp_get_wtime();
+
     float *A;
     float *B;
     float *C;
@@ -131,7 +125,6 @@ int main(int argc, char **argv) {
     read_matrix_from_file("B.bin", &B, B_rows, B_cols);
     read_matrix_from_file("C.bin", &C, A_rows, B_cols);
 
-    double dtime = omp_get_wtime();
     multiply(A, B, C, A_rows, A_cols, B_cols);
     dtime = omp_get_wtime() - dtime;
 

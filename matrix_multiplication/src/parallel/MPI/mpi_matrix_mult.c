@@ -236,10 +236,8 @@ float *divide_rows(char *filename, int matrix_rows, int matrix_cols,
 
 
 /// @brief This function computes the matrix multiplication between A and B, and saves the result in the array C_temp.
-float *multiplyMatrices(float *A, int A_rows, int A_cols, float *B, int B_rows, int B_cols, int rank) {
+float *multiply_matrices(float *A, int A_rows, int A_cols, float *B, int B_rows, int B_cols) {
     
-    double start, end;
-
     if (A_cols != B_rows) {
         fprintf(stderr, "The number of columns in A must be equal to the number of rows in B.\n");
         return NULL;
@@ -251,19 +249,13 @@ float *multiplyMatrices(float *A, int A_rows, int A_cols, float *B, int B_rows, 
         return NULL;
     }
 
-    start = MPI_Wtime();
-
     for (int i = 0; i < A_rows; ++i) {
-        for (int k = 0; k < A_cols; ++k) {
-            for (int j = 0; j < B_cols; ++j) {
+        for (int j = 0; j < B_cols; ++j) {
+            for (int k = 0; k < A_cols; ++k) {
                 C_temp[i * B_cols + j] += A[i * A_cols + k] * B[k * B_cols + j];
             }
         }
     }
-
-    end = MPI_Wtime();
-
-    printf("[Process %d] Multiplication time = %f\n", rank, end-start);
 
     return C_temp;
 }
@@ -300,23 +292,6 @@ void *send_matrix_to_root(float *matrix, int num_rows, int num_cols, int rank, i
     MPI_Reduce(matrix, result, num_rows*num_cols, MPI_FLOAT, MPI_SUM, 0, group_comm);
 
     MPI_Barrier(group_comm);    // sync barrier
-
-    #ifdef DEBUG
-    int group_rank;
-    MPI_Comm_rank(group_comm, &group_rank);
-
-    if (group_rank == 0)  {
-        printf("\n[Process %d] Printing the resulting matrix C_temp (%dx%d)\n", rank, num_rows, num_cols);
-        for (int i = 0; i < num_rows; i++) {
-            puts("");
-            for (int j = 0; j < num_cols; j++) {
-                printf("%d ", (int)result[i*num_cols + j]);
-            }
-        }
-        puts("");
-        fflush(stdout);
-    }
-    #endif
 
     return result;
 }
@@ -434,10 +409,11 @@ int main(int argc, char** argv) {
     int n_proc, my_rank;
     MPI_Comm comm;
 
-    double start, end, s;
-
     MPI_Init(&argc, &argv);
     MPI_Comm_dup(MPI_COMM_WORLD, &comm);
+
+    double start, end;
+    start = MPI_Wtime();
 
     MPI_Comm_size(comm, &n_proc);
     MPI_Comm_rank(comm, &my_rank);
@@ -445,99 +421,36 @@ int main(int argc, char** argv) {
     int result_rows = A_rows;
     int result_cols = B_cols;
 
-    /* sync barrier */
-    MPI_Barrier(comm);
-
-    start = MPI_Wtime();
-
     int num_rows;
     int num_cols;
     
-    s = MPI_Wtime();
     /* divide matrix A between processes, according to a block cyclic distribution */
     float *A = block_cyclic_distribution("A.bin", A_rows, A_cols, block_rows, block_cols, proc_rows, proc_cols, &num_rows, &num_cols, comm);
-    if (my_rank == 0) {
-        printf("Block cyclic distribution of A: %.4f\n", MPI_Wtime() - s);
-    }
 
-    #ifdef DEBUG
-    printf("[Process %d] Got %d elements\n", my_rank, num_rows * num_cols);
-    #endif
-
-    s = MPI_Wtime();
     /* divide matrix B between processes, by rows */
-    float *B = divide_rows("B.bin", B_rows, B_cols, block_rows, proc_cols, num_cols, comm);    
-    if (my_rank == 0) {
-        printf("Distribution of B: %.4f\n", MPI_Wtime() - s);
-    }
+    float *B = divide_rows("B.bin", B_rows, B_cols, block_rows, proc_cols, num_cols, comm);   
    
     /* perform matrix multiplication */
-    float *C_temp = multiplyMatrices(A, num_rows, num_cols, B, num_cols, B_cols, my_rank);
+    float *C_temp = multiply_matrices(A, num_rows, num_cols, B, num_cols, B_cols);
 
-    s = MPI_Wtime();
     /* every process sends its C_temp matrix to the first process (say root process) in the same row, in the process grid */
     float *partial_result = send_matrix_to_root(C_temp, num_rows, B_cols, my_rank, proc_cols, comm);
-    if (my_rank == 0) {
-        printf("Partial result reduction: %.4f\n", MPI_Wtime() - s);
-    }
-
-    #ifdef DEBUG
-    printf("\n[Process %d] Printing the matrix A (%dx%d)\n", my_rank, num_rows, num_cols);
-    for (int i = 0; i < num_rows; i++) {
-        puts("");
-        for (int j = 0; j < num_cols; j++) {
-            printf("%d ", (int)A[i*num_cols + j]);
-        }
-    }
-    puts("");
-    fflush(stdout);
-
-    printf("\n[Process %d] Printing the matrix B (%dx%d)\n", my_rank, num_cols, B_cols);
-    for (int i = 0; i < num_cols; i++) {
-        puts("");
-        for (int j = 0; j < B_cols; j++) {
-            printf("%d ", (int)B[i*B_cols + j]);
-        }
-    }
-    puts("");
-    fflush(stdout);
-
-    printf("\n[Process %d] Printing the matrix C (%dx%d)\n", my_rank, num_rows, B_cols);
-    for (int i = 0; i < num_rows; i++) {
-        puts("");
-        for (int j = 0; j < B_cols; j++) {
-            printf("%d ", (int)C_temp[i*B_cols + j]);
-        }
-    }
-    puts("");
-    fflush(stdout);
-    #endif
 
 
     /* Now, we have to sum C_temp (A x B) to C, in order to get the final result.
     *  To do that, we distribute the rows of both matrices between all the processes. */
-
     MPI_Barrier(comm);
 
     int C_rows, C_cols;
 
     compute_submatrix_dimension(A_rows, B_cols, block_rows, B_cols, proc_rows, 1, my_rank, &C_rows, &C_cols);
-
-    s = MPI_Wtime(); 
     float *C = divide_rows("C.bin", A_rows, B_cols, block_rows, proc_cols, C_cols, comm);
-    if (my_rank == 0) {
-        printf("Distribution of C: %.4f\n", MPI_Wtime() - s);
-    }
 
-    s = MPI_Wtime();
     if (my_rank % proc_cols == 0) {
         /* C + A x B */
         for (int i = 0; i < num_rows * B_cols; i++) {
             partial_result[i] += C[i];
         }
-    }
-    if (my_rank == 0) {
-        printf("Final result computation: %.4f\n", MPI_Wtime() - s);
     }
 
     MPI_Barrier(comm);
@@ -548,24 +461,18 @@ int main(int argc, char** argv) {
     int root_rank;
     MPI_Comm_rank(root_comm, &root_rank);
 
-
-    s = MPI_Wtime();
     /* Write result on file */
     if (my_rank % proc_cols == 0) {
         write_result_to_file("mpi_result.bin", partial_result, num_rows * B_cols, my_rank, result_rows, result_cols, block_rows, proc_rows, proc_cols, root_comm);
     }
-    if (my_rank == 0) {
-        printf("Final result writing on file: %.4f\n", MPI_Wtime() - s);
-    }
     
-
+    /* final cleanup */
     free(A);
     free(B);
     free(C_temp);
     free(C);
     free(partial_result);
 
-    MPI_Barrier(comm);
     end = MPI_Wtime();
 
     float elapsed_time = end-start;
