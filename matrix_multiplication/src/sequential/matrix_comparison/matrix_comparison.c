@@ -142,8 +142,6 @@ float compute_speedup(float parallel_time, float sequential_time) {
 
 int main(int argc, char *argv[]) {
 
-    printf("%d\n", argc);
-
     if (argc != 12) {
         printf("Usage: ./comparison m k n proc_rows proc_cols block_rows block_cols num_threads sequential_time parallel_time mpi/openmp/sequential\n");
         return 1;
@@ -169,10 +167,7 @@ int main(int argc, char *argv[]) {
 
 
     if (!strcmp(type, "mpi")) {
-        puts("");
-        printf("Comparing sequential result to mpi result\n");
-
-        printf("MPI time received: %f\n", parallel_time);
+        
 
         float *mpi_result = read_matrix_from_file("mpi_result.bin", rows, cols);
         float *mpi_comparison = compare_matrices(sequential_result, mpi_result, rows, cols);
@@ -197,10 +192,6 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    puts("");
-    printf("Comparing sequential result to openmp result\n");
-
-    printf("OpenMP time received: %f\n", parallel_time);
 
     float *openmp_result = read_matrix_from_file("openmp_result.bin", rows, cols);
     float *openmp_comparison = compare_matrices(sequential_result, openmp_result, rows, cols);
