@@ -13,7 +13,7 @@ float* generate_random_matrix(int rows, int cols, int seed, int zero_matrix) {
         float* matrix = new float[rows * cols];
 
         std::mt19937 gen(seed);                                         // mersenne twister.
-        std::uniform_real_distribution<float> dist(0.0f, 1.0f);         // distribute results between 0.0 and 1.0 inclusive.
+        std::uniform_real_distribution<float> dist(0.0f, 100.0f);         // distribute results between 0.0 and 1.0 inclusive.
 
         for (int i = 0; i < rows * cols; ++i) {
             matrix[i] = dist(gen);
