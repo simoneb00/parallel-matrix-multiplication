@@ -443,8 +443,8 @@ int main(int argc, char** argv) {
 
     int C_rows, C_cols;
 
-    compute_submatrix_dimension(A_rows, B_cols, block_rows, B_cols, proc_rows, 1, my_rank, &C_rows, &C_cols);
-    float *C = divide_rows("C.bin", A_rows, B_cols, block_rows, proc_cols, C_cols, comm);
+    compute_submatrix_dimension(A_rows, B_cols, block_rows, B_cols, proc_rows, proc_cols, my_rank, &C_rows, &C_cols);
+    float *C = divide_rows("C.bin", A_rows, B_cols, block_rows, proc_rows, C_rows, comm);
 
     if (my_rank % proc_cols == 0) {
         /* C + A x B */
